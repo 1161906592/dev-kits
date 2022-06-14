@@ -9,6 +9,7 @@ export function toMockTemplate(raw: RandomItem | RandomItem[]): any {
   if (Array.isArray(raw)) {
     return raw.reduce((acc, cur) => {
       acc[cur.name] = toMockTemplate(cur)
+
       return acc
     }, {} as Record<string, any>)
   } else if (raw.enum?.length) {
@@ -28,6 +29,7 @@ export function toMockTemplate(raw: RandomItem | RandomItem[]): any {
       if (!raw.children?.length) {
         return []
       }
+
       return [toMockTemplate(raw.children?.[0] as RandomItem)]
     }
   }

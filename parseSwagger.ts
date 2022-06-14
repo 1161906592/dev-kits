@@ -1,5 +1,4 @@
 import generate from "@babel/generator"
-
 import {
   tsInterfaceDeclaration,
   tsInterfaceBody,
@@ -41,7 +40,7 @@ import {
   TSTypeAnnotation,
 } from "@babel/types"
 import { mock } from "mockjs"
-import toMockTemplate from "./to-mock-template"
+import toMockTemplate from "./toMockTemplate"
 
 type JavaBaseType = "integer" | "number" | "string" | "boolean"
 type JavaType = JavaBaseType | "array" | "object"
@@ -167,6 +166,7 @@ function matchRefInterfaceName($ref?: string) {
 
 function transformOperationId(operationId: string) {
   const index = operationId.indexOf("Using")
+
   return index === -1 ? operationId : operationId.slice(0, index)
 }
 
@@ -189,19 +189,25 @@ function collectProgramBody(context: Context) {
     const typeNameEndIndex = definitionKey.indexOf("«")
     const interfaceName = typeNameEndIndex === -1 ? definitionKey : definitionKey.slice(0, typeNameEndIndex)
     const curInterfaceNameCache = interfaceNameCache[interfaceName]
+
     if (!curInterfaceNameCache) {
       interfaceNameCache[interfaceName] = { [definitionKey]: 0 }
+
       return interfaceName
     }
+
     const definitionKeyCache = curInterfaceNameCache[definitionKey]
+
     if (definitionKeyCache !== undefined) {
       return interfaceName + (definitionKeyCache || "")
     } else {
       const index = Object.keys(curInterfaceNameCache).length
       curInterfaceNameCache[definitionKey] = index
+
       return interfaceName + index
     }
   }
+
   function javaTypeToTsKeyword(
     javaType: JavaType,
     item?: DefinitionArrayItem,
@@ -209,23 +215,29 @@ function collectProgramBody(context: Context) {
     if (javaType === "string") {
       return tsStringKeyword()
     }
+
     if (["number", "integer"].includes(javaType)) {
       return tsNumberKeyword()
     }
+
     if (javaType === "boolean") {
       return tsBooleanKeyword()
     }
+
     if (javaType === "object") {
       return tsObjectKeyword()
     }
+
     if (javaType === "array") {
       const refDefinitionKey = matchRefInterfaceName(item?.$ref)
       resolveTsInterface(refDefinitionKey)
+
       const tsKeyword = refDefinitionKey
         ? tsTypeReference(identifier(transformInterfaceName(refDefinitionKey)))
         : item?.type
         ? javaTypeToTsKeyword(item?.type)
         : null
+
       if (tsKeyword) {
         return tsArrayType(tsKeyword)
       }
@@ -236,25 +248,32 @@ function collectProgramBody(context: Context) {
     if (!definitionKey || !definitions[definitionKey] || definitionKeyCache[definitionKey]) {
       return
     }
+
     const { properties } = definitions[definitionKey]
     const interfaceBody: Array<TSTypeElement> = []
+
     Object.keys(properties).forEach((propName) => {
       const { type, $ref, description, items } = properties[propName]
       const refDefinitionKey = matchRefInterfaceName($ref)
       resolveTsInterface(refDefinitionKey)
+
       const tsKeyword = refDefinitionKey
         ? tsTypeReference(identifier(transformInterfaceName(refDefinitionKey)))
         : type
         ? javaTypeToTsKeyword(type, items)
         : null
+
       if (!tsKeyword) {
         console.log(`the ${propName} attribute of the ${definitionKey} is ignored`)
+
         return
       }
+
       const node = {
         ...makeTsPropertySignature(propName, tsTypeAnnotation(tsKeyword)),
         optional: true,
       }
+
       interfaceBody.push(description ? addComment(node, "trailing", ` ${description}`, true) : node)
     })
 
@@ -272,28 +291,36 @@ function collectProgramBody(context: Context) {
 
   function resolveQueryOrPath(resolveType: "query" | "path") {
     const interfaceBody: Array<TSTypeElement> = []
+
     const interfaceName =
       toFirstUpperCase(name) + toFirstUpperCase(resolveType === "path" ? "pathVariables" : resolveType)
+
     parameters.forEach((parameter) => {
       if (parameter.in !== resolveType) {
         return
       }
+
       const { name, description, required, type, schema } = parameter
       const refDefinitionKey = matchRefInterfaceName(schema?.$ref)
       resolveTsInterface(refDefinitionKey)
+
       const tsKeyword = refDefinitionKey
         ? tsTypeReference(identifier(transformInterfaceName(refDefinitionKey)))
         : type
         ? javaTypeToTsKeyword(type as JavaType)
         : null
+
       if (!tsKeyword) {
         console.log(`the ${name} attribute of the ${interfaceName} is ignored`)
+
         return
       }
+
       const node = {
         ...makeTsPropertySignature(name, tsTypeAnnotation(tsKeyword)),
         optional: !required,
       }
+
       interfaceBody.push(description ? addComment(node, "trailing", ` ${description}`, true) : node)
     })
 
@@ -316,12 +343,15 @@ function collectProgramBody(context: Context) {
     if (!definitionKey || !definitions[definitionKey]) {
       return []
     }
+
     const { properties, required } = definitions[definitionKey]
     const tableRaws: TableRowVO[] = []
+
     Object.keys(properties).forEach((propName) => {
       const { type, $ref, description, items, format, enum: enums } = properties[propName]
+
       tableRaws.push({
-        id: id++,
+        id: (id += 1),
         name: propName,
         type: type || "object",
         format,
@@ -332,7 +362,7 @@ function collectProgramBody(context: Context) {
           type === "array"
             ? [
                 {
-                  id: id++,
+                  id: (id += 1),
                   name: "[Array Item]",
                   type: items?.type || "object",
                   required: true,
@@ -370,12 +400,15 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
     tags,
     paths: Object.keys(paths).reduce((acc1, path) => {
       const curPath = paths[path]
+
       acc1[path] = Object.keys(curPath).reduce((acc2, method) => {
         const curRequest = curPath[method]
         const definitionKey = matchRefInterfaceName(curRequest.responses["200"].schema?.$ref)
+
         if (!definitionKey) {
           return acc2
         }
+
         const { operationId, parameters, summary, description, tags, consumes, produces } = curRequest
 
         const name = transformOperationId(operationId)
@@ -384,6 +417,7 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
           [importDefaultSpecifier(identifier("http"))],
           stringLiteral("@utils/http"),
         )
+
         const exportDefaultDeclarationNode = exportDefaultDeclaration(identifier(name))
 
         const context = {
@@ -409,6 +443,7 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
                 .map((d, i, arr) => templateElement({ raw: d, cooked: d }, i === arr.length - 1)),
               pathVariableParameters.map((d) => {
                 const computed = d.name.includes("-")
+
                 return memberExpression(
                   identifier("pathVariables"),
                   computed ? stringLiteral(d.name) : identifier(d.name),
@@ -480,6 +515,7 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
           .filter((d) => d.in === "query")
           .map((item, index) => {
             const { name, type, format, required, description } = item
+
             return {
               id: index + 1,
               name,
@@ -489,8 +525,10 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
               description,
             }
           })
+
         const pathVariables = pathVariableParameters.map((item, index) => {
           const { name, type, format, required, description } = item
+
           return {
             id: index + 1,
             name,
@@ -519,8 +557,10 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
           mockJSON: JSON.stringify(mock(mockTemplate), null, 2),
           mockTemplate: JSON.stringify(mockTemplate, null, 2),
         }
+
         return acc2
       }, {} as Record<string, ParsedRequestDefinition>)
+
       return acc1
     }, {} as Record<string, Record<string, ParsedRequestDefinition>>),
   }
