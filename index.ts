@@ -1,4 +1,4 @@
-// import axios from "axios"
+import axios from "axios"
 import Koa from "koa"
 import koaBody from "koa-body"
 import cors from "koa-cors"
@@ -6,7 +6,6 @@ import koaStatic from "koa-static"
 import LruCache from "lru-cache"
 import { mock } from "mockjs"
 import parseSwagger, { ParsedSwagger, Swagger } from "./parseSwagger"
-import swaggerJSon from "./swagger.json"
 import toMockTemplate from "./toMockTemplate"
 
 const app = new Koa()
@@ -21,20 +20,26 @@ const lruCache = new LruCache<string, ParsedSwagger>({
   max: 1024 * 4,
 })
 
-lruCache.set("swagger", parseSwagger(swaggerJSon as unknown as Swagger))
-
 app.use(cors())
 app.use(koaBody())
 
 // 获取swagger配置
 app.use(async (ctx, next) => {
-  // const { data } = await axios.get<Swagger>(ctx.query.url as string)
   if (ctx.headers["x-use-mock"]) {
     return await next()
   }
 
   if (ctx.path === "/swagger") {
-    ctx.body = JSON.stringify(lruCache.get("swagger"))
+    const url = ctx.query.url as string
+    const refresh = ctx.query.refresh as string
+
+    if (refresh === "1" || !lruCache.get(url)) {
+      const { data } = await axios.get<Swagger>(url)
+      const parsedSwagger = parseSwagger(data)
+      lruCache.set(url, parsedSwagger)
+    }
+
+    ctx.body = JSON.stringify(lruCache.get(url))
   } else if (ctx.path === "/mockConfig" && ctx.method === "POST") {
     const {
       request: { body },

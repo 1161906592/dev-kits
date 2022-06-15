@@ -27,7 +27,6 @@ import {
   returnStatement,
   callExpression,
   objectExpression,
-  tsTypeParameterInstantiation,
   objectProperty,
   ObjectProperty,
   exportDefaultDeclaration,
@@ -38,6 +37,8 @@ import {
   memberExpression,
   TSTypeAnnotation,
   importSpecifier,
+  arrowFunctionExpression,
+  tsAsExpression,
 } from "@babel/types"
 import { mock } from "mockjs"
 import toMockTemplate from "./toMockTemplate"
@@ -75,6 +76,7 @@ interface Parameter {
   allowEmptyValue?: boolean
   schema?: {
     $ref: string
+    type?: string
   }
 }
 
@@ -85,7 +87,7 @@ interface RequestDefinition {
   summary: string
   description: string
   operationId: string
-  parameters: Parameter[]
+  parameters?: Parameter[]
   responses: Record<
     "200",
     {
@@ -249,6 +251,8 @@ function collectProgramBody(context: Context) {
       return
     }
 
+    definitionKeyCache[definitionKey] = 1
+
     const { properties } = definitions[definitionKey]
     const interfaceBody: Array<TSTypeElement> = []
 
@@ -283,7 +287,6 @@ function collectProgramBody(context: Context) {
       tsInterfaceDeclaration(identifier(interfaceName), null, null, tsInterfaceBody(interfaceBody)),
     )
 
-    definitionKeyCache[definitionKey] = 1
     program.body.push(exportInterface)
 
     return interfaceName
@@ -296,18 +299,16 @@ function collectProgramBody(context: Context) {
       toFirstUpperCase(name) + toFirstUpperCase(resolveType === "path" ? "pathVariables" : resolveType)
 
     parameters.forEach((parameter) => {
-      if (parameter.in !== resolveType) {
-        return
-      }
-
       const { name, description, required, type, schema } = parameter
+      if (!((resolveType === "query" && !schema?.$ref) || parameter.in === resolveType)) return
+
       const refDefinitionKey = matchRefInterfaceName(schema?.$ref)
       resolveTsInterface(refDefinitionKey)
 
       const tsKeyword = refDefinitionKey
         ? tsTypeReference(identifier(transformInterfaceName(refDefinitionKey)))
-        : type
-        ? javaTypeToTsKeyword(type as JavaType)
+        : type || schema?.type
+        ? javaTypeToTsKeyword((type || schema?.type) as JavaType)
         : null
 
       if (!tsKeyword) {
@@ -339,8 +340,8 @@ function collectProgramBody(context: Context) {
 
   let id = 1
 
-  function resolveTableRaws(definitionKey?: string) {
-    if (!definitionKey || !definitions[definitionKey]) {
+  function resolveTableRaws(deep: number, definitionKey?: string) {
+    if (deep > 10 || !definitionKey || !definitions[definitionKey]) {
       return []
     }
 
@@ -366,10 +367,10 @@ function collectProgramBody(context: Context) {
                   name: "[Array Item]",
                   type: items?.type || "object",
                   required: true,
-                  children: resolveTableRaws(matchRefInterfaceName(items?.$ref)),
+                  children: resolveTableRaws(deep + 1, matchRefInterfaceName(items?.$ref)),
                 },
               ]
-            : resolveTableRaws(matchRefInterfaceName($ref)),
+            : resolveTableRaws(deep + 1, matchRefInterfaceName($ref)),
       })
     })
 
@@ -380,8 +381,8 @@ function collectProgramBody(context: Context) {
     .filter((d) => d.in === "body" && d.schema?.$ref)
     .map((d) => matchRefInterfaceName(d.schema?.$ref))
 
-  const requestBody = refDefinitionKeys.map((refDefinitionKey) => resolveTableRaws(refDefinitionKey))
-  const responseBody = resolveTableRaws(definitionKey)
+  const requestBody = refDefinitionKeys.map((refDefinitionKey) => resolveTableRaws(0, refDefinitionKey))
+  const responseBody = resolveTableRaws(0, definitionKey)
 
   return {
     bodyInterfaces: refDefinitionKeys.map((refDefinitionKey) => resolveTsInterface(refDefinitionKey) as string),
@@ -399,15 +400,6 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
   return {
     tags,
     paths: Object.keys(paths).reduce((acc1, path) => {
-      if (
-        !paths[path].get?.tags.includes("高炉配料") &&
-        !paths[path].post?.tags.includes("高炉配料") &&
-        !paths[path].put?.tags.includes("高炉配料") &&
-        !paths[path].delete?.tags.includes("高炉配料")
-      ) {
-        return acc1
-      }
-
       const curPath = paths[path]
 
       acc1[path] = Object.keys(curPath).reduce((acc2, method) => {
@@ -462,16 +454,33 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
             )
           : stringLiteral(path)
 
-        const callExpressionNode = callExpression(identifier("request"), [
-          objectExpression(
+        const createCallExpressionNode = (isTs: boolean) =>
+          callExpression(
+            memberExpression(
+              callExpression(identifier("request"), [
+                objectExpression(
+                  [
+                    objectProperty(identifier("url"), urlValueNode),
+                    objectProperty(identifier("method"), stringLiteral(method)),
+                    queryInterface && objectProperty(identifier("params"), identifier("query")),
+                    bodyInterfaces.length && objectProperty(identifier("data"), identifier("data"), false, true),
+                  ].filter(Boolean) as ObjectProperty[],
+                ),
+              ]),
+              identifier("then"),
+            ),
             [
-              objectProperty(identifier("url"), urlValueNode),
-              objectProperty(identifier("method"), stringLiteral(method)),
-              queryInterface && objectProperty(identifier("params"), identifier("query")),
-              bodyInterfaces.length && objectProperty(identifier("data"), identifier("data"), false, true),
-            ].filter(Boolean) as ObjectProperty[],
-          ),
-        ])
+              arrowFunctionExpression(
+                [identifier("res")],
+                isTs && resInterface
+                  ? tsAsExpression(
+                      memberExpression(identifier("res"), identifier("data")),
+                      tsTypeReference(identifier(resInterface)),
+                    )
+                  : memberExpression(identifier("res"), identifier("data")),
+              ),
+            ],
+          )
 
         const tsApiFunction = functionDeclaration(
           identifier(name),
@@ -489,14 +498,7 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
               typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(bodyInterfaces[0]))),
             },
           ].filter(Boolean) as Identifier[],
-          blockStatement([
-            returnStatement({
-              ...callExpressionNode,
-              typeParameters: resInterface
-                ? tsTypeParameterInstantiation([tsTypeReference(identifier(resInterface))])
-                : null,
-            }),
-          ]),
+          blockStatement([returnStatement(createCallExpressionNode(true))]),
         )
 
         const jsApiFunction = functionDeclaration(
@@ -506,7 +508,7 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
             queryInterface && identifier("query"),
             bodyInterfaces.length && identifier("data"),
           ].filter(Boolean) as Identifier[],
-          blockStatement([returnStatement(callExpressionNode)]),
+          blockStatement([returnStatement(createCallExpressionNode(false))]),
         )
 
         if (summary || description) {
@@ -521,14 +523,14 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
         const jsCode = generateCode(program([importDeclarationNode, jsApiFunction, exportDefaultDeclarationNode]))
 
         const query = (curRequest.parameters || [])
-          .filter((d) => d.in === "query")
+          .filter((d) => d.in === "query" || (d.in === "body" && !d.schema?.$ref))
           .map((item, index) => {
-            const { name, type, format, required, description } = item
+            const { name, type, format, required, schema, description } = item
 
             return {
               id: index + 1,
               name,
-              type: type || "object",
+              type: type || schema?.type || "object",
               format,
               required,
               description,
