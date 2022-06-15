@@ -21,7 +21,7 @@ const lruCache = new LruCache<string, ParsedSwagger>({
   max: 1024 * 4,
 })
 
-lruCache.set("swagger", parseSwagger(swaggerJSon as Swagger))
+lruCache.set("swagger", parseSwagger(swaggerJSon as unknown as Swagger))
 
 app.use(cors())
 app.use(koaBody())

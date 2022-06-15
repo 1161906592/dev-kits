@@ -20,7 +20,6 @@ import {
   TSBooleanKeyword,
   Program,
   importDeclaration,
-  importDefaultSpecifier,
   stringLiteral,
   functionDeclaration,
   blockStatement,
@@ -38,6 +37,7 @@ import {
   templateElement,
   memberExpression,
   TSTypeAnnotation,
+  importSpecifier,
 } from "@babel/types"
 import { mock } from "mockjs"
 import toMockTemplate from "./toMockTemplate"
@@ -183,7 +183,7 @@ function makeTsPropertySignature(name: string, tsTypeAnnotation: TSTypeAnnotatio
 }
 
 function collectProgramBody(context: Context) {
-  const { program, definitionKeyCache, interfaceNameCache, definitionKey, definitions, name, parameters } = context
+  const { program, definitionKeyCache, interfaceNameCache, definitionKey, definitions, name, parameters = [] } = context
 
   function transformInterfaceName(definitionKey: string) {
     const typeNameEndIndex = definitionKey.indexOf("«")
@@ -344,7 +344,7 @@ function collectProgramBody(context: Context) {
       return []
     }
 
-    const { properties, required } = definitions[definitionKey]
+    const { properties, required = [] } = definitions[definitionKey]
     const tableRaws: TableRowVO[] = []
 
     Object.keys(properties).forEach((propName) => {
@@ -399,6 +399,15 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
   return {
     tags,
     paths: Object.keys(paths).reduce((acc1, path) => {
+      if (
+        !paths[path].get?.tags.includes("高炉配料") &&
+        !paths[path].post?.tags.includes("高炉配料") &&
+        !paths[path].put?.tags.includes("高炉配料") &&
+        !paths[path].delete?.tags.includes("高炉配料")
+      ) {
+        return acc1
+      }
+
       const curPath = paths[path]
 
       acc1[path] = Object.keys(curPath).reduce((acc2, method) => {
@@ -409,13 +418,13 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
           return acc2
         }
 
-        const { operationId, parameters, summary, description, tags, consumes, produces } = curRequest
+        const { operationId, parameters = [], summary, description, tags, consumes, produces } = curRequest
 
         const name = transformOperationId(operationId)
 
         const importDeclarationNode = importDeclaration(
-          [importDefaultSpecifier(identifier("http"))],
-          stringLiteral("@utils/http"),
+          [importSpecifier(identifier("request"), identifier("request"))],
+          stringLiteral("@celi/shared"),
         )
 
         const exportDefaultDeclarationNode = exportDefaultDeclaration(identifier(name))
@@ -453,7 +462,7 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
             )
           : stringLiteral(path)
 
-        const callExpressionNode = callExpression(identifier("http"), [
+        const callExpressionNode = callExpression(identifier("request"), [
           objectExpression(
             [
               objectProperty(identifier("url"), urlValueNode),
@@ -511,7 +520,7 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
         const tsCode = generateCode(context.program)
         const jsCode = generateCode(program([importDeclarationNode, jsApiFunction, exportDefaultDeclarationNode]))
 
-        const query = curRequest.parameters
+        const query = (curRequest.parameters || [])
           .filter((d) => d.in === "query")
           .map((item, index) => {
             const { name, type, format, required, description } = item
