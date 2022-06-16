@@ -37,8 +37,10 @@ import {
   memberExpression,
   TSTypeAnnotation,
   importSpecifier,
-  arrowFunctionExpression,
   tsAsExpression,
+  variableDeclaration,
+  variableDeclarator,
+  awaitExpression,
 } from "@babel/types"
 import { mock } from "mockjs"
 import toMockTemplate from "./toMockTemplate"
@@ -454,33 +456,34 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
             )
           : stringLiteral(path)
 
-        const createCallExpressionNode = (isTs: boolean) =>
-          callExpression(
-            memberExpression(
-              callExpression(identifier("request"), [
-                objectExpression(
-                  [
-                    objectProperty(identifier("url"), urlValueNode),
-                    objectProperty(identifier("method"), stringLiteral(method)),
-                    queryInterface && objectProperty(identifier("params"), identifier("query")),
-                    bodyInterfaces.length && objectProperty(identifier("data"), identifier("data"), false, true),
-                  ].filter(Boolean) as ObjectProperty[],
+        const createBlockStatementNode = (isTs: boolean) =>
+          blockStatement([
+            variableDeclaration("const", [
+              variableDeclarator(
+                identifier("res"),
+                awaitExpression(
+                  callExpression(identifier("request"), [
+                    objectExpression(
+                      [
+                        objectProperty(identifier("url"), urlValueNode),
+                        objectProperty(identifier("method"), stringLiteral(method)),
+                        queryInterface && objectProperty(identifier("params"), identifier("query")),
+                        bodyInterfaces.length && objectProperty(identifier("data"), identifier("data"), false, true),
+                      ].filter(Boolean) as ObjectProperty[],
+                    ),
+                  ]),
                 ),
-              ]),
-              identifier("then"),
-            ),
-            [
-              arrowFunctionExpression(
-                [identifier("res")],
-                isTs && resInterface
-                  ? tsAsExpression(
-                      memberExpression(identifier("res"), identifier("data")),
-                      tsTypeReference(identifier(resInterface)),
-                    )
-                  : memberExpression(identifier("res"), identifier("data")),
               ),
-            ],
-          )
+            ]),
+            returnStatement(
+              isTs && resInterface
+                ? tsAsExpression(
+                    memberExpression(identifier("res"), identifier("data")),
+                    tsTypeReference(identifier(resInterface)),
+                  )
+                : memberExpression(identifier("res"), identifier("data")),
+            ),
+          ])
 
         const tsApiFunction = functionDeclaration(
           identifier(name),
@@ -498,7 +501,9 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
               typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(bodyInterfaces[0]))),
             },
           ].filter(Boolean) as Identifier[],
-          blockStatement([returnStatement(createCallExpressionNode(true))]),
+          createBlockStatementNode(true),
+          false,
+          true,
         )
 
         const jsApiFunction = functionDeclaration(
@@ -508,7 +513,9 @@ function parseSwagger(swagger: Swagger): ParsedSwagger {
             queryInterface && identifier("query"),
             bodyInterfaces.length && identifier("data"),
           ].filter(Boolean) as Identifier[],
-          blockStatement([returnStatement(createCallExpressionNode(false))]),
+          createBlockStatementNode(false),
+          false,
+          true,
         )
 
         if (summary || description) {
