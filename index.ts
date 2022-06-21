@@ -5,8 +5,12 @@ import cors from "koa-cors"
 import koaStatic from "koa-static"
 import LruCache from "lru-cache"
 import { mock } from "mockjs"
-import parseSwagger, { ParsedSwagger, Swagger } from "./parseSwagger"
-import toMockTemplate from "./toMockTemplate"
+import { createCodeParser } from "./codePaser"
+import { createMockParser } from "./mockPaser"
+import swaggerJSON from "./swagger.json"
+import { Paths, Swagger } from "./types"
+
+const paths = swaggerJSON.paths as unknown as Paths
 
 const app = new Koa()
 
@@ -16,7 +20,7 @@ function sleep(timeout: number) {
   })
 }
 
-const lruCache = new LruCache<string, ParsedSwagger>({
+const lruCache = new LruCache<string, any>({
   max: 1024 * 4,
 })
 
@@ -29,25 +33,37 @@ app.use(async (ctx, next) => {
     return await next()
   }
 
-  if (ctx.path === "/swagger") {
+  if (ctx.path === "/swagger/parseResult") {
     const url = ctx.query.url as string
     const refresh = ctx.query.refresh as string
 
     if (refresh === "1" || !lruCache.get(url)) {
       const { data } = await axios.get<Swagger>(url)
-      const parsedSwagger = parseSwagger(data)
-      lruCache.set(url, parsedSwagger)
+      const codeParser = createCodeParser(data as unknown as Swagger)
+      const mockParser = createMockParser(data as unknown as Swagger)
+
+      Object.keys(paths).forEach((path) => {
+        Object.keys(paths[path]).forEach((method) => {
+          const { tsCode, jsCode } = codeParser(path, method)
+          paths[path][method].tsCode = tsCode
+          paths[path][method].jsCode = jsCode
+          paths[path][method].mockTemplate = JSON.stringify(mockParser(path, method), null, 2)
+          paths[path][method].mockJSON = JSON.stringify(mock(mockParser(path, method)), null, 2)
+        })
+      })
+
+      lruCache.set(url, data)
     }
 
     ctx.body = JSON.stringify(lruCache.get(url))
-  } else if (ctx.path === "/mockConfig" && ctx.method === "POST") {
+  } else if (ctx.path === "/swagger/mockConfig" && ctx.method === "POST") {
     const {
       request: { body },
     } = ctx
 
     lruCache.set((body.url as string) + body.method + body.type, body.config)
     ctx.body = 0
-  } else if (ctx.path === "/mockConfig" && ctx.method === "GET") {
+  } else if (ctx.path === "/swagger/mockConfig" && ctx.method === "GET") {
     const { query } = ctx
     const cacheResult = lruCache.get((query.url as string) + query.method + query.type)
 
@@ -80,7 +96,7 @@ app.use(async (ctx, next) => {
   }
 
   await sleep(Number(ctx.headers["x-mock-timeout"]) || 0)
-  ctx.body = mock(toMockTemplate(responseBody))
+  ctx.body = ""
 })
 
 app.use(koaStatic(`${__dirname}/static`))

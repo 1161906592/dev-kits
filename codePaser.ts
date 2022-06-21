@@ -46,104 +46,18 @@ import {
   tsAsExpression,
   Program,
 } from "@babel/types"
-import swaggerJSON from "./swagger.json"
-
-type JavaBaseType = "integer" | "number" | "string" | "boolean"
-type JavaType = JavaBaseType | "array" | "object"
-
-interface DefinitionArrayItem {
-  $ref?: string
-  type?: JavaBaseType
-}
-
-interface Definition {
-  required: string[]
-  properties: Properties
-}
-
-type Properties = Record<
-  string,
-  {
-    type?: JavaType
-    $ref?: string
-    description?: string
-    items?: DefinitionArrayItem
-    format?: string
-    enum?: (string | number)[]
-  }
->
-
-interface Parameter {
-  name: string
-  in: "query" | "body" | "path"
-  description: string
-  required: boolean
-  type: string
-  format?: string
-  allowEmptyValue?: boolean
-  schema?: {
-    $ref: string
-    type?: string
-  }
-}
-
-interface RequestDefinition {
-  tags: string[]
-  produces?: string[]
-  consumes?: string[]
-  summary: string
-  description: string
-  operationId: string
-  parameters?: Parameter[]
-  responses: Record<
-    "200",
-    {
-      description: string
-      schema: {
-        $ref: string
-      }
-    }
-  >
-}
-
-export interface TableRowVO {
-  id: number
-  name: string
-  type?: string
-  format?: string
-  required?: boolean
-  enum?: (string | number)[]
-  description?: string
-  children?: TableRowVO[]
-}
-
-interface ParsedRequestDefinition {
-  tsCode: string
-}
-
-interface Paths {
-  [key: string]: Record<string, RequestDefinition>
-}
-
-export interface ParsedSwagger {
-  [key: string]: Record<string, ParsedRequestDefinition>
-}
-
-interface Tag {
-  name: string
-  description?: string
-}
-
-export interface Swagger {
-  tags: Tag[]
-  paths: Paths
-  definitions: Record<string, Definition>
-}
-
-// 匹配引用类型的名称
-function matchInterfaceName($ref?: string) {
-  return $ref?.match(/#\/definitions\/(\w+).*/)?.[1] || ""
-}
+import {
+  Definition,
+  DefinitionArrayItem,
+  ExportFunctionOptions,
+  JavaType,
+  Parameter,
+  Paths,
+  Properties,
+  RequestDefinition,
+  Swagger,
+} from "./types"
+import { matchInterfaceName } from "./utils"
 
 function makeTsPropertySignature(name: string, tsTypeAnnotation: TSTypeAnnotation) {
   return tsPropertySignature(name.includes("-") ? stringLiteral(name) : identifier(name), tsTypeAnnotation)
@@ -219,10 +133,10 @@ function toInterfaceBodyMap(definitions: Record<string, Definition>) {
 
 function resolveInterface($ref: string, map: Record<string, TSInterfaceBody>, collector: ExportNamedDeclaration[]) {
   const tSInterfaceBody = map[$ref.substring("#/definitions/".length)]
+  if (!tSInterfaceBody) return
   if (collector.some((d) => (d.declaration as TSInterfaceDeclaration).body === tSInterfaceBody)) return
 
   const interfaceName = matchInterfaceName($ref)
-  !tSInterfaceBody && console.log(111, tSInterfaceBody, $ref)
 
   collector.unshift(
     exportNamedDeclaration(tsInterfaceDeclaration(identifier(interfaceName), null, null, tSInterfaceBody)),
@@ -298,9 +212,13 @@ function resolveQueryOrPath(
 }
 
 function resolveResponseBodyInterface(definition: RequestDefinition, map: Record<string, TSInterfaceBody>) {
+  const $ref = definition.responses[200].schema?.$ref
+
   const collector: ExportNamedDeclaration[] = []
 
-  resolveInterface(definition.responses[200].schema.$ref, map, collector)
+  if ($ref) {
+    resolveInterface($ref, map, collector)
+  }
 
   return collector
 }
@@ -329,17 +247,6 @@ function resolvePath(definition: RequestDefinition, name: string, map: Record<st
   return resolveQueryOrPath(definition.parameters || [], transformOperationId(definition.operationId), "path", map)
 }
 
-interface ExportFunctionOptions {
-  parameters: Parameter[]
-  name: string
-  path: string
-  method: string
-  pathInterface?: string
-  queryInterface?: string
-  bodyInterface?: string
-  responseBody?: string
-}
-
 function resolveExportFunction(options: ExportFunctionOptions) {
   const { parameters, name, path, method, pathInterface, queryInterface, bodyInterface, responseBody } = options
   const pathVariableParameters = parameters.filter((d) => d.in === "path")
@@ -362,22 +269,7 @@ function resolveExportFunction(options: ExportFunctionOptions) {
       )
     : stringLiteral(path)
 
-  const tsApiFunction = functionDeclaration(
-    identifier(name),
-    [
-      pathInterface && {
-        ...identifier("pathVariables"),
-        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(pathInterface))),
-      },
-      queryInterface && {
-        ...identifier("query"),
-        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(queryInterface))),
-      },
-      bodyInterface && {
-        ...identifier("data"),
-        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(bodyInterface))),
-      },
-    ].filter(Boolean) as Identifier[],
+  const createBlockStatementNode = (isTs: boolean) =>
     blockStatement([
       variableDeclaration("const", [
         variableDeclarator(
@@ -397,19 +289,49 @@ function resolveExportFunction(options: ExportFunctionOptions) {
         ),
       ]),
       returnStatement(
-        responseBody
+        isTs && responseBody
           ? tsAsExpression(
               memberExpression(identifier("res"), identifier("data")),
               tsTypeReference(identifier(responseBody)),
             )
           : memberExpression(identifier("res"), identifier("data")),
       ),
-    ]),
+    ])
+
+  const tsApiFunctionNode = functionDeclaration(
+    identifier(name),
+    [
+      pathInterface && {
+        ...identifier("pathVariables"),
+        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(pathInterface))),
+      },
+      queryInterface && {
+        ...identifier("query"),
+        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(queryInterface))),
+      },
+      bodyInterface && {
+        ...identifier("data"),
+        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(bodyInterface))),
+      },
+    ].filter(Boolean) as Identifier[],
+    createBlockStatementNode(true),
     false,
     true,
   )
 
-  return [tsApiFunction, exportDefaultDeclaration(identifier(name))]
+  const jsApiFunctionNode = functionDeclaration(
+    identifier(name),
+    [
+      pathInterface && identifier("pathVariables"),
+      queryInterface && identifier("query"),
+      bodyInterface && identifier("data"),
+    ].filter(Boolean) as Identifier[],
+    createBlockStatementNode(false),
+    false,
+    true,
+  )
+
+  return { tsApiFunctionNode, jsApiFunctionNode }
 }
 
 function resolveProgram(paths: Paths, path: string, method: string, map: Record<string, TSInterfaceBody>) {
@@ -419,36 +341,62 @@ function resolveProgram(paths: Paths, path: string, method: string, map: Record<
   const queryExports = resolveQuery(definition, name, map)
   const requestBodyExports = resolveRequestBodyInterface(definition, map)
   const responseBodyExports = resolveResponseBodyInterface(definition, map)
+  const pathInterface = (pathExports[pathExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
+  const queryInterface = (queryExports[queryExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
 
-  return program(
+  const bodyInterface = (requestBodyExports[requestBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
+    .name
+
+  const responseBody = (responseBodyExports[responseBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
+    .name
+
+  const { tsApiFunctionNode, jsApiFunctionNode } = resolveExportFunction({
+    parameters: definition.parameters || [],
+    name,
+    path,
+    method,
+    pathInterface,
+    queryInterface,
+    bodyInterface,
+    responseBody,
+  })
+
+  const tsProgram = program(
     [
       importDeclaration([importSpecifier(identifier("request"), identifier("request"))], stringLiteral("@celi/shared")),
       pathExports,
       queryExports,
       requestBodyExports,
       responseBodyExports,
-      resolveExportFunction({
-        parameters: definition.parameters || [],
-        name,
-        path,
-        method,
-        pathInterface: (pathExports[pathExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name,
-        queryInterface: (queryExports[queryExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name,
-        bodyInterface: (requestBodyExports[requestBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
-          .name,
-        responseBody: (responseBodyExports[responseBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
-          .name,
-      }),
+      tsApiFunctionNode,
+      exportDefaultDeclaration(identifier(name)),
     ].flat(),
   )
+
+  const jsProgram = program(
+    [
+      importDeclaration([importSpecifier(identifier("request"), identifier("request"))], stringLiteral("@celi/shared")),
+      jsApiFunctionNode,
+      exportDefaultDeclaration(identifier(name)),
+    ].flat(),
+  )
+
+  return { tsProgram, jsProgram }
 }
 
 function generateCode(program: Program) {
   return generate(program).code.replace(/\n\n/g, "\n").replace(/;/g, "")
 }
 
-const map = toInterfaceBodyMap(swaggerJSON.definitions as unknown as Record<string, Definition>)
+export function createCodeParser(swaggerJSON: Swagger) {
+  const map = toInterfaceBodyMap(swaggerJSON.definitions as unknown as Record<string, Definition>)
 
-console.log(
-  generateCode(resolveProgram(swaggerJSON.paths as unknown as Paths, "/api/algorithm/burden/pageVersion", "post", map)),
-)
+  return (path: string, method: string) => {
+    const { tsProgram, jsProgram } = resolveProgram(swaggerJSON.paths, path, method, map)
+
+    return {
+      tsCode: generateCode(tsProgram),
+      jsCode: generateCode(jsProgram),
+    }
+  }
+}
