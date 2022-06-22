@@ -361,6 +361,14 @@ function resolveProgram(paths: Paths, path: string, method: string, map: Record<
     responseBody,
   })
 
+  // 函数注释
+  const { summary, description } = definition
+
+  if (summary || description) {
+    addComment(tsApiFunctionNode, "leading", ` ${[summary, description].filter(Boolean).join(", ")}`, true)
+    addComment(jsApiFunctionNode, "leading", ` ${[summary, description].filter(Boolean).join(", ")}`, true)
+  }
+
   const tsProgram = program(
     [
       importDeclaration([importSpecifier(identifier("request"), identifier("request"))], stringLiteral("@celi/shared")),
