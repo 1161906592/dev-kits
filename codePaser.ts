@@ -19,7 +19,6 @@ import {
   tsObjectKeyword,
   TSObjectKeyword,
   TSTypeAnnotation,
-  TSInterfaceBody,
   exportNamedDeclaration,
   tsInterfaceDeclaration,
   ExportNamedDeclaration,
@@ -121,22 +120,14 @@ function javaTypeToTsKeyword(
   }
 }
 
-function toInterfaceBodyMap(definitions: Record<string, Definition>) {
-  const map: Record<string, TSInterfaceBody> = {}
+function resolveInterface(ref: string, definitions: Record<string, Definition>, collector: ExportNamedDeclaration[]) {
+  if (!ref) return
+  const interfaceName = matchInterfaceName(ref)
+  if (collector.some((d) => (d.declaration as TSInterfaceDeclaration).id.name === interfaceName)) return
+  const properties = definitions[ref.substring("#/definitions/".length)].properties
+  if (!properties) return
 
-  Object.keys(definitions).forEach((key) => {
-    map[key] = toInterfaceBody(definitions[key].properties)
-  })
-
-  return map
-}
-
-function resolveInterface($ref: string, map: Record<string, TSInterfaceBody>, collector: ExportNamedDeclaration[]) {
-  const tSInterfaceBody = map[$ref.substring("#/definitions/".length)]
-  if (!tSInterfaceBody) return
-  if (collector.some((d) => (d.declaration as TSInterfaceDeclaration).body === tSInterfaceBody)) return
-
-  const interfaceName = matchInterfaceName($ref)
+  const tSInterfaceBody = toInterfaceBody(properties)
 
   collector.unshift(
     exportNamedDeclaration(tsInterfaceDeclaration(identifier(interfaceName), null, null, tSInterfaceBody)),
@@ -147,7 +138,7 @@ function resolveInterface($ref: string, map: Record<string, TSInterfaceBody>, co
       ?.typeName || (item.typeAnnotation?.typeAnnotation as TSTypeReference)?.typeName) as Identifier
 
     if (refIdentifier?.name) {
-      resolveInterface(refIdentifier.name, map, collector)
+      resolveInterface(refIdentifier.name, definitions, collector)
       refIdentifier.name = matchInterfaceName(refIdentifier.name)
     }
   })
@@ -161,7 +152,7 @@ function resolveQueryOrPath(
   parameters: Parameter[],
   name: string,
   resolveType: "query" | "path",
-  map: Record<string, TSInterfaceBody>,
+  definitions: Record<string, Definition>,
 ) {
   const collector: ExportNamedDeclaration[] = []
 
@@ -175,7 +166,7 @@ function resolveQueryOrPath(
     if (!((resolveType === "query" && !schema?.$ref) || parameter.in === resolveType)) return
 
     if (schema?.$ref) {
-      resolveInterface(schema.$ref, map, collector)
+      resolveInterface(schema.$ref, definitions, collector)
     }
 
     const tsKeyword = schema?.$ref
@@ -211,24 +202,24 @@ function resolveQueryOrPath(
   return collector
 }
 
-function resolveResponseBodyInterface(definition: RequestDefinition, map: Record<string, TSInterfaceBody>) {
+function resolveResponseBodyInterface(definition: RequestDefinition, definitions: Record<string, Definition>) {
   const $ref = definition.responses[200].schema?.$ref
 
   const collector: ExportNamedDeclaration[] = []
 
   if ($ref) {
-    resolveInterface($ref, map, collector)
+    resolveInterface($ref, definitions, collector)
   }
 
   return collector
 }
 
-function resolveRequestBodyInterface(definition: RequestDefinition, map: Record<string, TSInterfaceBody>) {
+function resolveRequestBodyInterface(definition: RequestDefinition, definitions: Record<string, Definition>) {
   const collector: ExportNamedDeclaration[] = []
 
   definition.parameters
     ?.filter((d) => d.in === "body" && d.schema?.$ref)
-    .forEach((d) => resolveInterface(d.schema?.$ref as string, map, collector))
+    .forEach((d) => resolveInterface(d.schema?.$ref as string, definitions, collector))
 
   return collector
 }
@@ -239,12 +230,22 @@ function transformOperationId(operationId: string) {
   return index === -1 ? operationId : operationId.slice(0, index)
 }
 
-function resolveQuery(definition: RequestDefinition, name: string, map: Record<string, TSInterfaceBody>) {
-  return resolveQueryOrPath(definition.parameters || [], transformOperationId(definition.operationId), "query", map)
+function resolveQuery(definition: RequestDefinition, definitions: Record<string, Definition>) {
+  return resolveQueryOrPath(
+    definition.parameters || [],
+    transformOperationId(definition.operationId),
+    "query",
+    definitions,
+  )
 }
 
-function resolvePath(definition: RequestDefinition, name: string, map: Record<string, TSInterfaceBody>) {
-  return resolveQueryOrPath(definition.parameters || [], transformOperationId(definition.operationId), "path", map)
+function resolvePath(definition: RequestDefinition, definitions: Record<string, Definition>) {
+  return resolveQueryOrPath(
+    definition.parameters || [],
+    transformOperationId(definition.operationId),
+    "path",
+    definitions,
+  )
 }
 
 function resolveExportFunction(options: ExportFunctionOptions) {
@@ -334,13 +335,13 @@ function resolveExportFunction(options: ExportFunctionOptions) {
   return { tsApiFunctionNode, jsApiFunctionNode }
 }
 
-function resolveProgram(paths: Paths, path: string, method: string, map: Record<string, TSInterfaceBody>) {
+function resolveProgram(paths: Paths, path: string, method: string, definitions: Record<string, Definition>) {
   const definition = paths[path][method]
   const name = transformOperationId(definition.operationId)
-  const pathExports = resolvePath(definition, name, map)
-  const queryExports = resolveQuery(definition, name, map)
-  const requestBodyExports = resolveRequestBodyInterface(definition, map)
-  const responseBodyExports = resolveResponseBodyInterface(definition, map)
+  const pathExports = resolvePath(definition, definitions)
+  const queryExports = resolveQuery(definition, definitions)
+  const requestBodyExports = resolveRequestBodyInterface(definition, definitions)
+  const responseBodyExports = resolveResponseBodyInterface(definition, definitions)
   const pathInterface = (pathExports[pathExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
   const queryInterface = (queryExports[queryExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
 
@@ -397,10 +398,8 @@ function generateCode(program: Program) {
 }
 
 export function createCodeParser(swaggerJSON: Swagger) {
-  const map = toInterfaceBodyMap(swaggerJSON.definitions as unknown as Record<string, Definition>)
-
   return (path: string, method: string) => {
-    const { tsProgram, jsProgram } = resolveProgram(swaggerJSON.paths, path, method, map)
+    const { tsProgram, jsProgram } = resolveProgram(swaggerJSON.paths, path, method, swaggerJSON.definitions)
 
     return {
       tsCode: generateCode(tsProgram),
