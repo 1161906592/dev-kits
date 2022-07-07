@@ -10,12 +10,25 @@ import { createCodeParser } from "./codePaser"
 import { createMockParser } from "./mockPaser"
 import { Swagger } from "./types"
 
+const dataDir = `${process.cwd()}/.swagger`
+fs.ensureFileSync(`${dataDir}/.gitignore`)
+fs.writeFileSync(`${dataDir}/.gitignore`, "*", "utf-8")
+
 const app = new Koa()
 
 function sleep(timeout: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, timeout)
   })
+}
+
+async function loadSwaggerJSON() {
+  return JSON.parse(await fs.readFile(`${dataDir}/api.json`, "utf-8")) as Swagger
+}
+
+async function saveSwaggerJSON(swaggerJSON: string) {
+  await fs.ensureFile(`${dataDir}/api.json`)
+  await fs.writeFile(`${dataDir}/api.json`, swaggerJSON, "utf-8")
 }
 
 app.use(cors())
@@ -44,15 +57,15 @@ app.use(async (ctx, next) => {
         })
       })
 
-      const result = JSON.stringify(data, null, 2)
-      fs.writeFileSync(`${__dirname}/swagger.json`, result, "utf-8")
-      ctx.body = result
+      const swaggerJSON = JSON.stringify(data, null, 2)
+      await saveSwaggerJSON(swaggerJSON)
+      ctx.body = swaggerJSON
 
       return
     }
 
     try {
-      ctx.body = require("./swagger.json")
+      ctx.body = await loadSwaggerJSON()
     } catch {
       ctx.body = "请先加载接口文档"
     }
@@ -66,7 +79,7 @@ app.use(async (ctx, next) => {
     } = ctx
 
     try {
-      const swaggerJSON = require("./swagger.json") as Swagger
+      const swaggerJSON = await loadSwaggerJSON()
       const cur = swaggerJSON.paths[body.url][body.method]
 
       if (body.type === "mockJSON") {
@@ -75,7 +88,7 @@ app.use(async (ctx, next) => {
         cur.mockTemplate = body.config
       }
 
-      fs.writeFileSync(`${__dirname}/swagger.json`, JSON.stringify(swaggerJSON, null, 2), "utf-8")
+      await saveSwaggerJSON(JSON.stringify(swaggerJSON, null, 2))
       ctx.body = "修改成功"
     } catch {
       ctx.body = "请先加载接口文档"
@@ -100,7 +113,7 @@ app.use(async (ctx, next) => {
     } = ctx
 
     try {
-      const swaggerJSON = require("./swagger.json") as Swagger
+      const swaggerJSON = await loadSwaggerJSON()
       const curPath = swaggerJSON.paths[body.url as string]
 
       if (!curPath) {
@@ -154,7 +167,7 @@ app.use(async (ctx, next) => {
   }
 
   try {
-    const swaggerJSON = require("./swagger.json") as Swagger
+    const swaggerJSON = require("./api.json") as Swagger
 
     if (ctx.headers["x-mock-type"] === "mock") {
       const mockTemplate = swaggerJSON.paths[ctx.path][ctx.method.toLocaleLowerCase()].mockTemplate
