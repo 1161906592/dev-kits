@@ -134,7 +134,24 @@ app.use(async (ctx, next) => {
         Object.keys(curPath).length > 1 ? `-${(body.method as string).toLocaleLowerCase()}` : ""
       }.ts`
 
-      await fs.ensureFile(filePath)
+      // 检测是否禁止覆盖
+      const isExists = await fs.pathExists(filePath)
+
+      if (isExists) {
+        const content = await fs.readFile(filePath, "utf-8")
+
+        if (/\/\*\s*swagger-no-overwrite\s*\*\//.test(content)) {
+          ctx.body = {
+            status: false,
+            message: "此接口已存在并且禁止被覆盖",
+          }
+
+          return
+        }
+      } else {
+        await fs.ensureFile(filePath)
+      }
+
       await fs.writeFile(filePath, tsCode, "utf-8")
 
       try {
@@ -147,9 +164,15 @@ app.use(async (ctx, next) => {
         console.log(e)
       }
 
-      ctx.body = "写入成功"
+      ctx.body = {
+        status: true,
+        message: "同步成功",
+      }
     } catch {
-      ctx.body = "请先加载接口文档"
+      ctx.body = {
+        status: false,
+        message: "请先加载接口文档",
+      }
     }
 
     return
