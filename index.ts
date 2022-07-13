@@ -114,61 +114,71 @@ app.use(async (ctx, next) => {
 
     try {
       const swaggerJSON = await loadSwaggerJSON()
-      const curPath = swaggerJSON.paths[body.url as string]
 
-      if (!curPath) {
-        ctx.body = "没有对应接口代码"
+      const result = await Promise.all(
+        (body as { path: string; method: string }[]).map(async (item) => {
+          const curPath = swaggerJSON.paths[item.path as string]
 
-        return
-      }
+          const tsCode = curPath[item.method as string].tsCode
 
-      const tsCode = curPath[body.method as string].tsCode
+          const filePath = `${process.cwd()}/src${item.path}${
+            Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ""
+          }.ts`
 
-      if (!tsCode) {
-        ctx.body = "没有对应接口代码"
+          // 检测是否禁止覆盖
+          const isExists = await fs.pathExists(filePath)
 
-        return
-      }
+          if (isExists) {
+            const content = await fs.readFile(filePath, "utf-8")
 
-      const filePath = `${process.cwd()}/src${body.url}${
-        Object.keys(curPath).length > 1 ? `-${(body.method as string).toLocaleLowerCase()}` : ""
-      }.ts`
-
-      // 检测是否禁止覆盖
-      const isExists = await fs.pathExists(filePath)
-
-      if (isExists) {
-        const content = await fs.readFile(filePath, "utf-8")
-
-        if (/\/\*\s*swagger-no-overwrite\s*\*\//.test(content)) {
-          ctx.body = {
-            status: false,
-            message: "此接口已存在并且禁止被覆盖",
+            if (/\/\*\s*swagger-no-overwrite\s*\*\//.test(content)) {
+              return {
+                status: "disabled",
+                filePath,
+                ...item,
+              }
+            }
+          } else {
+            await fs.ensureFile(filePath)
           }
 
-          return
-        }
-      } else {
-        await fs.ensureFile(filePath)
-      }
+          await fs.writeFile(filePath, tsCode, "utf-8")
 
-      await fs.writeFile(filePath, tsCode, "utf-8")
+          return {
+            status: "ok",
+            filePath,
+            ...item,
+          }
+        }),
+      )
 
       try {
         // 同步项目的eslint格式
-        await execa("eslint", ["--fix", filePath], {
-          stdio: "inherit",
-          cwd: process.cwd(),
-        })
+        await Promise.all(
+          result
+            .filter((d) => d.status === "ok")
+            .map((item) => {
+              return execa("eslint", ["--fix", item.filePath], {
+                stdio: "inherit",
+                cwd: process.cwd(),
+              })
+            }),
+        )
       } catch (e) {
         console.log(e)
       }
 
+      const disabledResult = result.filter((d) => d.status === "disabled")
+
       ctx.body = {
         status: true,
-        message: "同步成功",
+        message: disabledResult.length
+          ? `${disabledResult.map((d) => `${d.method.toUpperCase()}: ${d.path}`).join("、")}禁止被覆盖已跳过`
+          : "同步成功",
       }
-    } catch {
+    } catch (e) {
+      console.log(e)
+
       ctx.body = {
         status: false,
         message: "请先加载接口文档",
