@@ -52,7 +52,6 @@ import {
   JavaType,
   Parameter,
   Paths,
-  Properties,
   RequestDefinition,
   Swagger,
 } from "./types"
@@ -60,31 +59,6 @@ import { matchInterfaceName } from "./utils"
 
 function makeTsPropertySignature(name: string, tsTypeAnnotation: TSTypeAnnotation) {
   return tsPropertySignature(name.includes("-") ? stringLiteral(name) : identifier(name), tsTypeAnnotation)
-}
-
-function toInterfaceBody(properties: Properties) {
-  const interfaceBody: Array<TSTypeElement> = []
-
-  Object.keys(properties).forEach((propName) => {
-    const { type, $ref, description, items } = properties[propName]
-
-    const tsKeyword = $ref ? tsTypeReference(identifier($ref)) : type ? javaTypeToTsKeyword(type, items) : null
-
-    if (!tsKeyword) {
-      console.log(`the ${propName} attribute of the ${$ref} is ignored`)
-
-      return
-    }
-
-    const node = {
-      ...makeTsPropertySignature(propName, tsTypeAnnotation(tsKeyword)),
-      optional: true,
-    }
-
-    interfaceBody.push(description ? addComment(node, "trailing", ` ${description}`, true) : node)
-  })
-
-  return tsInterfaceBody(interfaceBody)
 }
 
 function javaTypeToTsKeyword(
@@ -120,25 +94,51 @@ function javaTypeToTsKeyword(
   }
 }
 
-function resolveInterface(ref: string, definitions: Record<string, Definition>, collector: ExportNamedDeclaration[]) {
+function resolveInterface(
+  ref: string,
+  definitions: Record<string, Definition>,
+  collector: ExportNamedDeclaration[],
+  markRequired: boolean,
+) {
   if (!ref) return
   const interfaceName = matchInterfaceName(ref)
   if (collector.some((d) => (d.declaration as TSInterfaceDeclaration).id.name === interfaceName)) return
-  const properties = definitions[ref.substring("#/definitions/".length)].properties
+  const { properties, required = [] } = definitions[ref.substring("#/definitions/".length)] || {}
   if (!properties) return
 
-  const tSInterfaceBody = toInterfaceBody(properties)
+  const interfaceBody: Array<TSTypeElement> = []
+
+  Object.keys(properties).forEach((propName) => {
+    const { type, $ref, description, items } = properties[propName]
+
+    const tsKeyword = $ref ? tsTypeReference(identifier($ref)) : type ? javaTypeToTsKeyword(type, items) : null
+
+    if (!tsKeyword) {
+      console.log(`the ${propName} attribute of the ${$ref} is ignored`)
+
+      return
+    }
+
+    const node = {
+      ...makeTsPropertySignature(propName, tsTypeAnnotation(tsKeyword)),
+      optional: !markRequired || !required.includes(propName),
+    }
+
+    interfaceBody.push(description ? addComment(node, "trailing", ` ${description}`, true) : node)
+  })
 
   collector.unshift(
-    exportNamedDeclaration(tsInterfaceDeclaration(identifier(interfaceName), null, null, tSInterfaceBody)),
+    exportNamedDeclaration(
+      tsInterfaceDeclaration(identifier(interfaceName), null, null, tsInterfaceBody(interfaceBody)),
+    ),
   )
 
-  tSInterfaceBody.body.forEach((item) => {
+  interfaceBody.forEach((item) => {
     const refIdentifier = (((item.typeAnnotation?.typeAnnotation as TSArrayType).elementType as TSTypeReference)
       ?.typeName || (item.typeAnnotation?.typeAnnotation as TSTypeReference)?.typeName) as Identifier
 
     if (refIdentifier?.name) {
-      resolveInterface(refIdentifier.name, definitions, collector)
+      resolveInterface(refIdentifier.name, definitions, collector, markRequired)
       refIdentifier.name = matchInterfaceName(refIdentifier.name)
     }
   })
@@ -166,7 +166,7 @@ function resolveQueryOrPath(
     if (!((resolveType === "query" && !schema?.$ref) || parameter.in === resolveType)) return
 
     if (schema?.$ref) {
-      resolveInterface(schema.$ref, definitions, collector)
+      resolveInterface(schema.$ref, definitions, collector, true)
     }
 
     const tsKeyword = schema?.$ref
@@ -208,7 +208,7 @@ function resolveResponseBodyInterface(definition: RequestDefinition, definitions
   const collector: ExportNamedDeclaration[] = []
 
   if ($ref) {
-    resolveInterface($ref, definitions, collector)
+    resolveInterface($ref, definitions, collector, false)
   }
 
   return collector
@@ -219,7 +219,7 @@ function resolveRequestBodyInterface(definition: RequestDefinition, definitions:
 
   definition.parameters
     ?.filter((d) => d.in === "body" && d.schema?.$ref)
-    .forEach((d) => resolveInterface(d.schema?.$ref as string, definitions, collector))
+    .forEach((d) => resolveInterface(d.schema?.$ref as string, definitions, collector, true))
 
   return collector
 }
