@@ -1,18 +1,18 @@
-import axios from "axios"
-import execa from "execa"
-import * as fs from "fs-extra"
-import Koa from "koa"
-import koaBody from "koa-body"
-import cors from "koa-cors"
-import koaStatic from "koa-static"
-import { mock } from "mockjs"
-import { createCodeParser } from "./codePaser"
-import { createMockParser } from "./mockPaser"
-import { Swagger } from "./types"
+import axios from 'axios'
+import execa from 'execa'
+import * as fs from 'fs-extra'
+import Koa from 'koa'
+import koaBody from 'koa-body'
+import cors from 'koa-cors'
+import koaStatic from 'koa-static'
+import { mock } from 'mockjs'
+import { createCodeParser } from './codePaser'
+import { createMockParser } from './mockPaser'
+import { Swagger } from './types'
 
 const dataDir = `${process.cwd()}/.swagger`
 fs.ensureFileSync(`${dataDir}/.gitignore`)
-fs.writeFileSync(`${dataDir}/.gitignore`, "*", "utf-8")
+fs.writeFileSync(`${dataDir}/.gitignore`, '*', 'utf-8')
 
 const app = new Koa()
 
@@ -23,12 +23,12 @@ function sleep(timeout: number) {
 }
 
 async function loadSwaggerJSON() {
-  return JSON.parse(await fs.readFile(`${dataDir}/api.json`, "utf-8")) as Swagger
+  return JSON.parse(await fs.readFile(`${dataDir}/api.json`, 'utf-8')) as Swagger
 }
 
 async function saveSwaggerJSON(swaggerJSON: string) {
   await fs.ensureFile(`${dataDir}/api.json`)
-  await fs.writeFile(`${dataDir}/api.json`, swaggerJSON, "utf-8")
+  await fs.writeFile(`${dataDir}/api.json`, swaggerJSON, 'utf-8')
 }
 
 app.use(cors())
@@ -37,11 +37,11 @@ app.use(koaBody())
 // 获取swagger配置
 app.use(async (ctx, next) => {
   // 获取文档数据
-  if (ctx.path === "/swagger/parseResult") {
+  if (ctx.path === '/swagger/parseResult') {
     const url = ctx.query.url as string
     const refresh = ctx.query.refresh as string
 
-    if (refresh === "1") {
+    if (refresh === '1') {
       const { data } = await axios.get<Swagger>(url)
       const codeParser = createCodeParser(data)
       const mockParser = createMockParser(data)
@@ -67,13 +67,13 @@ app.use(async (ctx, next) => {
     try {
       ctx.body = await loadSwaggerJSON()
     } catch {
-      ctx.body = "请先加载接口文档"
+      ctx.body = '请先加载接口文档'
     }
 
     return
   }
 
-  if (ctx.path === "/swagger/mockConfig" && ctx.method === "POST") {
+  if (ctx.path === '/swagger/mockConfig' && ctx.method === 'POST') {
     const {
       request: { body },
     } = ctx
@@ -82,22 +82,22 @@ app.use(async (ctx, next) => {
       const swaggerJSON = await loadSwaggerJSON()
       const cur = swaggerJSON.paths[body.url][body.method]
 
-      if (body.type === "mockJSON") {
+      if (body.type === 'mockJSON') {
         cur.mockJSON = body.config
       } else {
         cur.mockTemplate = body.config
       }
 
       await saveSwaggerJSON(JSON.stringify(swaggerJSON, null, 2))
-      ctx.body = "修改成功"
+      ctx.body = '修改成功'
     } catch {
-      ctx.body = "请先加载接口文档"
+      ctx.body = '请先加载接口文档'
     }
 
     return
   }
 
-  if (ctx.path === "/swagger/mockConfig" && ctx.method === "GET") {
+  if (ctx.path === '/swagger/mockConfig' && ctx.method === 'GET') {
     const { query } = ctx
 
     if (query) {
@@ -107,7 +107,7 @@ app.use(async (ctx, next) => {
     return
   }
 
-  if (ctx.path === "/swagger/writeDisk" && ctx.method === "POST") {
+  if (ctx.path === '/swagger/writeDisk' && ctx.method === 'POST') {
     const {
       request: { body },
     } = ctx
@@ -121,19 +121,25 @@ app.use(async (ctx, next) => {
 
           const tsCode = curPath[item.method as string].tsCode
 
-          const filePath = `${process.cwd()}/src${item.path}${
-            Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ""
-          }.ts`
+          let realPath = (swaggerJSON.basePath + item.path).replace(/\/+/g, '/')
+
+          if (!realPath.startsWith('/api')) {
+            realPath = `/api${realPath}`
+          }
+
+          const filePath = `${process.cwd()}/src${`${realPath}${
+            Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''
+          }.ts`}`
 
           // 检测是否禁止覆盖
           const isExists = await fs.pathExists(filePath)
 
           if (isExists) {
-            const content = await fs.readFile(filePath, "utf-8")
+            const content = await fs.readFile(filePath, 'utf-8')
 
             if (/\/\*\s*swagger-no-overwrite\s*\*\//.test(content)) {
               return {
-                status: "disabled",
+                status: 'disabled',
                 filePath,
                 ...item,
               }
@@ -142,46 +148,46 @@ app.use(async (ctx, next) => {
             await fs.ensureFile(filePath)
           }
 
-          await fs.writeFile(filePath, tsCode, "utf-8")
+          await fs.writeFile(filePath, tsCode, 'utf-8')
 
           return {
-            status: "ok",
+            status: 'ok',
             filePath,
             ...item,
           }
-        }),
+        })
       )
 
       try {
         // 同步项目的eslint格式
         await Promise.all(
           result
-            .filter((d) => d.status === "ok")
+            .filter((d) => d.status === 'ok')
             .map((item) => {
-              return execa("eslint", ["--fix", item.filePath], {
-                stdio: "inherit",
+              return execa('eslint', ['--fix', item.filePath], {
+                stdio: 'inherit',
                 cwd: process.cwd(),
               })
-            }),
+            })
         )
       } catch (e) {
         console.log(e)
       }
 
-      const disabledResult = result.filter((d) => d.status === "disabled")
+      const disabledResult = result.filter((d) => d.status === 'disabled')
 
       ctx.body = {
         status: true,
         message: disabledResult.length
-          ? `${disabledResult.map((d) => `${d.method.toUpperCase()}: ${d.path}`).join("、")}禁止被覆盖已跳过`
-          : "同步成功",
+          ? `${disabledResult.map((d) => `${d.method.toUpperCase()}: ${d.path}`).join('、')}禁止被覆盖已跳过`
+          : '同步成功',
       }
     } catch (e) {
       console.log(e)
 
       ctx.body = {
         status: false,
-        message: "请先加载接口文档",
+        message: '请先加载接口文档',
       }
     }
 
@@ -193,38 +199,38 @@ app.use(async (ctx, next) => {
 
 // mock接口
 app.use(async (ctx, next) => {
-  if (!ctx.path.startsWith("/api") || !ctx.headers["x-mock-type"]) {
+  if (!ctx.path.startsWith('/api') || !ctx.headers['x-mock-type']) {
     await next()
 
     return
   }
 
   try {
-    const swaggerJSON = require("./api.json") as Swagger
+    const swaggerJSON = require('./api.json') as Swagger
 
-    if (ctx.headers["x-mock-type"] === "mock") {
+    if (ctx.headers['x-mock-type'] === 'mock') {
       const mockTemplate = swaggerJSON.paths[ctx.path][ctx.method.toLocaleLowerCase()].mockTemplate
 
       if (mockTemplate) {
-        await sleep(Number(ctx.headers["x-mock-timeout"]) || 0)
+        await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
         ctx.body = mock(JSON.parse(mockTemplate))
 
         return
       }
     }
 
-    if (ctx.headers["x-mock-type"] === "json") {
+    if (ctx.headers['x-mock-type'] === 'json') {
       const mockJSON = swaggerJSON.paths[ctx.path][ctx.method.toLocaleLowerCase()].mockJSON
 
       if (mockJSON) {
-        await sleep(Number(ctx.headers["x-mock-timeout"]) || 0)
+        await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
         ctx.body = mockJSON
 
         return
       }
     }
   } catch {
-    ctx.body = "请先加载接口文档"
+    ctx.body = '请先加载接口文档'
   }
 
   await next()
@@ -232,6 +238,6 @@ app.use(async (ctx, next) => {
 
 app.use(koaStatic(`${__dirname}/static`))
 
-app.listen("7788", () => {
+app.listen('7788', () => {
   console.log(`server running at: http://localhost:${7788}`)
 })

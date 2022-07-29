@@ -1,6 +1,6 @@
-export type JavaBaseType = "integer" | "number" | "string" | "boolean"
+export type JavaBaseType = 'integer' | 'number' | 'string' | 'boolean'
 
-export type JavaType = JavaBaseType | "array" | "object"
+export type JavaType = JavaBaseType | 'array' | 'object'
 
 export interface DefinitionArrayItem {
   $ref?: string
@@ -25,7 +25,7 @@ export interface Property {
 
 export interface Parameter {
   name: string
-  in: "query" | "body" | "path"
+  in: 'query' | 'body' | 'path'
   description: string
   required: boolean
   type: string
@@ -50,7 +50,7 @@ export interface RequestDefinition {
   mockTemplate?: string
   mockJSON?: string
   responses: Record<
-    "200",
+    '200',
     {
       description: string
       schema?: {
@@ -70,6 +70,7 @@ export interface Tag {
 }
 
 export interface Swagger {
+  basePath: string
   tags: Tag[]
   paths: Paths
   definitions: Record<string, Definition>
