@@ -123,7 +123,7 @@ app.use(async (ctx, next) => {
 
           let realPath = (swaggerJSON.basePath + item.path).replace(/\/+/g, '/')
 
-          if (!realPath.startsWith('/api')) {
+          if (!realPath.startsWith('/api/')) {
             realPath = `/api${realPath}`
           }
 
@@ -199,17 +199,18 @@ app.use(async (ctx, next) => {
 
 // mock接口
 app.use(async (ctx, next) => {
-  if (!ctx.path.startsWith('/api') || !ctx.headers['x-mock-type']) {
+  if (!ctx.path.startsWith('/api/') || ctx.headers['x-use-mock'] !== '1' || !ctx.headers['x-mock-type']) {
     await next()
 
     return
   }
 
   try {
-    const swaggerJSON = require('./api.json') as Swagger
+    const swaggerJSON = await loadSwaggerJSON()
+    const realPath = swaggerJSON.basePath === '/' ? ctx.path : ctx.path.substring(`/api${swaggerJSON.basePath}`.length)
 
     if (ctx.headers['x-mock-type'] === 'mock') {
-      const mockTemplate = swaggerJSON.paths[ctx.path][ctx.method.toLocaleLowerCase()].mockTemplate
+      const mockTemplate = swaggerJSON.paths[realPath][ctx.method.toLocaleLowerCase()].mockTemplate
 
       if (mockTemplate) {
         await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
@@ -220,7 +221,7 @@ app.use(async (ctx, next) => {
     }
 
     if (ctx.headers['x-mock-type'] === 'json') {
-      const mockJSON = swaggerJSON.paths[ctx.path][ctx.method.toLocaleLowerCase()].mockJSON
+      const mockJSON = swaggerJSON.paths[realPath][ctx.method.toLocaleLowerCase()].mockJSON
 
       if (mockJSON) {
         await sleep(Number(ctx.headers['x-mock-timeout']) || 0)

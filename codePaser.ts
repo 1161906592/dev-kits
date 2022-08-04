@@ -359,7 +359,7 @@ function resolveProgram(
 
   let realPath = (basePath + path).replace(/\/+/g, '/')
 
-  if (!realPath.startsWith('/api')) {
+  if (!realPath.startsWith('/api/')) {
     realPath = `/api${realPath}`
   }
 
