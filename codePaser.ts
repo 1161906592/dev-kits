@@ -149,6 +149,7 @@ function toFirstUpperCase(str: string) {
 }
 
 function resolveQueryOrPath(
+  pathVars: string[],
   parameters: Parameter[],
   name: string,
   resolveType: 'query' | 'path',
@@ -163,7 +164,9 @@ function resolveQueryOrPath(
 
   parameters.forEach((parameter) => {
     const { name, description, required, type, schema } = parameter
-    if (!((resolveType === 'query' && !schema?.$ref) || parameter.in === resolveType)) return
+    if (schema?.$ref || (schema?.type === "array" && parameter.in !== "query")) return // 复杂类型在requestBody
+    if (resolveType === 'query' && pathVars.includes(name)) return // pathVars
+    if (resolveType === "path" && !(parameter.in !== "path" && pathVars.includes(name))) return // query
 
     if (schema?.$ref) {
       resolveInterface(schema.$ref, definitions, collector, true)
@@ -172,7 +175,7 @@ function resolveQueryOrPath(
     const tsKeyword = schema?.$ref
       ? tsTypeReference(identifier(schema?.$ref))
       : type || schema?.type
-      ? javaTypeToTsKeyword((type || schema?.type) as JavaType)
+      ? javaTypeToTsKeyword((type || schema?.type), schema?.items)
       : null
 
     if (!tsKeyword) {
@@ -216,12 +219,37 @@ function resolveResponseBodyInterface(definition: RequestDefinition, definitions
 
 function resolveRequestBodyInterface(definition: RequestDefinition, definitions: Record<string, Definition>) {
   const collector: ExportNamedDeclaration[] = []
+  let bodyTsTypeAnnotation: TSTypeAnnotation | undefined = undefined
 
-  definition.parameters
-    ?.filter((d) => d.in === 'body' && d.schema?.$ref)
-    .forEach((d) => resolveInterface(d.schema?.$ref as string, definitions, collector, true))
+  const item = definition.parameters
+    ?.find((d) => d.in === 'body' && (d.schema?.$ref || d.schema?.type === "array"))
 
-  return collector
+  if (!item) {
+    return { collector, bodyTsTypeAnnotation }
+  }
+  
+  if (item.schema?.type === "array") {
+    if (item.schema?.items?.$ref) {
+      resolveInterface(item.schema.items.$ref, definitions, collector, true)
+      const name = (collector[collector.length - 1].declaration as TSInterfaceDeclaration)?.id.name
+      if (name) {
+        bodyTsTypeAnnotation = tsTypeAnnotation(tsArrayType(tsTypeReference(identifier(name))))
+      }
+    } else {
+      const tsType = javaTypeToTsKeyword(item.schema.items?.type as JavaType)
+      if (tsType) {
+        bodyTsTypeAnnotation = tsTypeAnnotation(tsArrayType(tsType))
+      }
+    }
+  } else {
+    resolveInterface(item.schema?.$ref as string, definitions, collector, true)
+    const name = (collector[collector.length - 1].declaration as TSInterfaceDeclaration)?.id.name
+    if (name) {
+      bodyTsTypeAnnotation = tsTypeAnnotation(tsTypeReference(identifier(name)))
+    }
+  }
+
+  return { collector, bodyTsTypeAnnotation }
 }
 
 function transformOperationId(operationId: string) {
@@ -230,8 +258,9 @@ function transformOperationId(operationId: string) {
   return index === -1 ? operationId : operationId.slice(0, index)
 }
 
-function resolveQuery(definition: RequestDefinition, definitions: Record<string, Definition>) {
+function resolveQuery(pathVars: string[], definition: RequestDefinition, definitions: Record<string, Definition>) {
   return resolveQueryOrPath(
+    pathVars,
     definition.parameters || [],
     transformOperationId(definition.operationId),
     'query',
@@ -239,8 +268,9 @@ function resolveQuery(definition: RequestDefinition, definitions: Record<string,
   )
 }
 
-function resolvePath(definition: RequestDefinition, definitions: Record<string, Definition>) {
+function resolvePath(pathVars: string[], definition: RequestDefinition, definitions: Record<string, Definition>) {
   return resolveQueryOrPath(
+    pathVars,
     definition.parameters || [],
     transformOperationId(definition.operationId),
     'path',
@@ -249,8 +279,8 @@ function resolvePath(definition: RequestDefinition, definitions: Record<string, 
 }
 
 function resolveExportFunction(options: ExportFunctionOptions) {
-  const { parameters, name, path, method, pathInterface, queryInterface, bodyInterface, responseBody } = options
-  const pathVariableParameters = parameters.filter((d) => d.in === 'path')
+  const { parameters, name, path, method, pathInterface, queryInterface, bodyTsTypeAnnotation, responseBody, pathVars } = options
+  const pathVariableParameters = parameters.filter((d) => d.in === 'path' || pathVars.includes(d.name))
 
   // 处理路径参数的url
   const urlValueNode = pathVariableParameters.length
@@ -282,7 +312,7 @@ function resolveExportFunction(options: ExportFunctionOptions) {
                   objectProperty(identifier('url'), urlValueNode),
                   objectProperty(identifier('method'), stringLiteral(method)),
                   queryInterface && objectProperty(identifier('params'), identifier('query')),
-                  bodyInterface && objectProperty(identifier('data'), identifier('data'), false, true),
+                  bodyTsTypeAnnotation && objectProperty(identifier('data'), identifier('data'), false, true),
                 ].filter(Boolean) as ObjectProperty[]
               ),
             ])
@@ -310,9 +340,9 @@ function resolveExportFunction(options: ExportFunctionOptions) {
         ...identifier('query'),
         typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(queryInterface))),
       },
-      bodyInterface && {
+      bodyTsTypeAnnotation && {
         ...identifier('data'),
-        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(bodyInterface))),
+        typeAnnotation: bodyTsTypeAnnotation,
       },
     ].filter(Boolean) as Identifier[],
     createBlockStatementNode(true),
@@ -325,7 +355,7 @@ function resolveExportFunction(options: ExportFunctionOptions) {
     [
       pathInterface && identifier('pathVariables'),
       queryInterface && identifier('query'),
-      bodyInterface && identifier('data'),
+      bodyTsTypeAnnotation && identifier('data'),
     ].filter(Boolean) as Identifier[],
     createBlockStatementNode(false),
     false,
@@ -344,15 +374,13 @@ function resolveProgram(
 ) {
   const definition = paths[path][method]
   const name = transformOperationId(definition.operationId)
-  const pathExports = resolvePath(definition, definitions)
-  const queryExports = resolveQuery(definition, definitions)
-  const requestBodyExports = resolveRequestBodyInterface(definition, definitions)
+  const pathVars = path.match(/\{(.+?)\}/g)?.map(d => d.slice(1,-1)) || []
+  const pathExports = resolvePath(pathVars, definition, definitions)
+  const queryExports = resolveQuery(pathVars, definition, definitions)
+  const { collector: requestBodyExports, bodyTsTypeAnnotation } = resolveRequestBodyInterface(definition, definitions)
   const responseBodyExports = resolveResponseBodyInterface(definition, definitions)
   const pathInterface = (pathExports[pathExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
   const queryInterface = (queryExports[queryExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
-
-  const bodyInterface = (requestBodyExports[requestBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
-    .name
 
   const responseBody = (responseBodyExports[responseBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
     .name
@@ -370,8 +398,9 @@ function resolveProgram(
     method,
     pathInterface,
     queryInterface,
-    bodyInterface,
+    bodyTsTypeAnnotation,
     responseBody,
+    pathVars
   })
 
   // 函数注释

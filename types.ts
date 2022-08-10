@@ -1,3 +1,5 @@
+import { TSTypeAnnotation } from "@babel/types"
+
 export type JavaBaseType = 'integer' | 'number' | 'string' | 'boolean'
 
 export type JavaType = JavaBaseType | 'array' | 'object'
@@ -28,12 +30,13 @@ export interface Parameter {
   in: 'query' | 'body' | 'path'
   description: string
   required: boolean
-  type: string
+  type: JavaBaseType
   format?: string
   allowEmptyValue?: boolean
   schema?: {
     $ref: string
-    type?: string
+    type?: JavaType
+    items?: DefinitionArrayItem
   }
 }
 
@@ -83,6 +86,7 @@ export interface ExportFunctionOptions {
   method: string
   pathInterface?: string
   queryInterface?: string
-  bodyInterface?: string
+  bodyTsTypeAnnotation?: TSTypeAnnotation
   responseBody?: string
+  pathVars: string[]
 }
