@@ -44,7 +44,7 @@ app.use(async (ctx, next) => {
 
     if (refresh === '1') {
       const res = await axios.get<Swagger>(url).catch(async (e) => {
-        if (e.response.status) {
+        if (e.response?.status === 404) {
           // 去掉basePath重试
           const urlInst = new URL(url)
           const pathname = urlInst.pathname
