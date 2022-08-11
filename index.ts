@@ -1,3 +1,4 @@
+import { URL } from 'url'
 import axios from 'axios'
 import execa from 'execa'
 import * as fs from 'fs-extra'
@@ -42,24 +43,40 @@ app.use(async (ctx, next) => {
     const refresh = ctx.query.refresh as string
 
     if (refresh === '1') {
-      const { data } = await axios.get<Swagger>(url)
-      const codeParser = createCodeParser(data)
-      const mockParser = createMockParser(data)
-      const paths = data.paths
+      const res = await axios.get<Swagger>(url).catch(async (e) => {
+        if (e.response.status) {
+          // 去掉basePath重试
+          const urlInst = new URL(url)
+          const pathname = urlInst.pathname
+          urlInst.pathname = '/v2/api-docs'
+          const res = await axios.get<Swagger>(urlInst.toString())
+          res.data.basePath = pathname.slice(0, -'/v2/api-docs'.length)
 
-      Object.keys(paths).forEach((path) => {
-        Object.keys(paths[path]).forEach((method) => {
-          const { tsCode, jsCode } = codeParser(path, method)
-          paths[path][method].tsCode = tsCode
-          paths[path][method].jsCode = jsCode
-          paths[path][method].mockTemplate = JSON.stringify(mockParser(path, method), null, 2)
-          paths[path][method].mockJSON = JSON.stringify(mock(mockParser(path, method)), null, 2)
-        })
+          return res
+        }
       })
 
-      const swaggerJSON = JSON.stringify(data, null, 2)
-      await saveSwaggerJSON(swaggerJSON)
-      ctx.body = swaggerJSON
+      const data = res?.data
+
+      if (data) {
+        const codeParser = createCodeParser(data)
+        const mockParser = createMockParser(data)
+        const paths = data.paths
+
+        Object.keys(paths).forEach((path) => {
+          Object.keys(paths[path]).forEach((method) => {
+            const { tsCode, jsCode } = codeParser(path, method)
+            paths[path][method].tsCode = tsCode
+            paths[path][method].jsCode = jsCode
+            paths[path][method].mockTemplate = JSON.stringify(mockParser(path, method), null, 2)
+            paths[path][method].mockJSON = JSON.stringify(mock(mockParser(path, method)), null, 2)
+          })
+        })
+
+        const swaggerJSON = JSON.stringify(data, null, 2)
+        await saveSwaggerJSON(swaggerJSON)
+        ctx.body = swaggerJSON
+      }
 
       return
     }
