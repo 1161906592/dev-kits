@@ -109,7 +109,7 @@ function resolveInterface(
   const interfaceBody: Array<TSTypeElement> = []
 
   Object.keys(properties).forEach((propName) => {
-    const { type, $ref, description, items } = properties[propName]
+    const { type, $ref, description, format, items } = properties[propName]
 
     const tsKeyword = $ref ? tsTypeReference(identifier($ref)) : type ? javaTypeToTsKeyword(type, items) : null
 
@@ -124,7 +124,7 @@ function resolveInterface(
       optional: !markRequired || !required.includes(propName),
     }
 
-    interfaceBody.push(description ? addComment(node, 'trailing', ` ${description}`, true) : node)
+    interfaceBody.push(description ? addComment(node, 'trailing', ` ${description}${format ? ` ${format}` : ''}`, true) : node)
   })
 
   collector.unshift(
