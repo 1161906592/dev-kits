@@ -1,4 +1,4 @@
-import { TSTypeAnnotation } from "@babel/types"
+import { TSTypeAnnotation } from '@babel/types'
 
 export type JavaBaseType = 'integer' | 'number' | 'string' | 'boolean'
 

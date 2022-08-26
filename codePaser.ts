@@ -124,7 +124,9 @@ function resolveInterface(
       optional: !markRequired || !required.includes(propName),
     }
 
-    interfaceBody.push(description ? addComment(node, 'trailing', ` ${description}${format ? ` ${format}` : ''}`, true) : node)
+    interfaceBody.push(
+      description ? addComment(node, 'trailing', ` ${description}${format ? ` ${format}` : ''}`, true) : node
+    )
   })
 
   collector.unshift(

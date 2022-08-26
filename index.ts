@@ -5,7 +5,6 @@ import * as fs from 'fs-extra'
 import Koa from 'koa'
 import koaBody from 'koa-body'
 import cors from 'koa-cors'
-import koaStatic from 'koa-static'
 import { mock } from 'mockjs'
 import { createCodeParser } from './codePaser'
 import { createMockParser } from './mockPaser'
@@ -253,8 +252,6 @@ app.use(async (ctx, next) => {
 
   await next()
 })
-
-app.use(koaStatic(`${__dirname}/static`))
 
 app.listen('7788', () => {
   console.log(`server running at: http://localhost:${7788}`)
