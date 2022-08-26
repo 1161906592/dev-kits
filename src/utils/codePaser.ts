@@ -54,7 +54,7 @@ import {
   Paths,
   RequestDefinition,
   Swagger,
-} from './types'
+} from '../types'
 import { matchInterfaceName } from './utils'
 
 function makeTsPropertySignature(name: string, tsTypeAnnotation: TSTypeAnnotation) {

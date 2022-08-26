@@ -1,43 +1,16 @@
-import { URL } from 'url'
 import axios from 'axios'
 import execa from 'execa'
 import * as fs from 'fs-extra'
-import Koa from 'koa'
-import koaBody from 'koa-body'
-import cors from 'koa-cors'
+import { ParameterizedContext } from 'koa'
 import { mock } from 'mockjs'
-import { createCodeParser } from './codePaser'
-import { createMockParser } from './mockPaser'
-import { Swagger } from './types'
+import { Swagger } from '../types'
+import { createCodeParser } from '../utils/codePaser'
+import { loadConfig } from '../utils/config'
+import { createMockParser } from '../utils/mockPaser'
+import { loadSwaggerJSON, saveSwaggerJSON } from '../utils/utils'
 
-const dataDir = `${process.cwd()}/.swagger`
-fs.ensureFileSync(`${dataDir}/.gitignore`)
-fs.writeFileSync(`${dataDir}/.gitignore`, '*', 'utf-8')
-
-const app = new Koa()
-
-function sleep(timeout: number) {
-  return new Promise<void>((resolve) => {
-    setTimeout(resolve, timeout)
-  })
-}
-
-async function loadSwaggerJSON() {
-  return JSON.parse(await fs.readFile(`${dataDir}/api.json`, 'utf-8')) as Swagger
-}
-
-async function saveSwaggerJSON(swaggerJSON: string) {
-  await fs.ensureFile(`${dataDir}/api.json`)
-  await fs.writeFile(`${dataDir}/api.json`, swaggerJSON, 'utf-8')
-}
-
-app.use(cors())
-app.use(koaBody())
-
-// 获取swagger配置
-app.use(async (ctx, next) => {
-  // 获取文档数据
-  if (ctx.path === '/swagger/parseResult') {
+class ApiController {
+  async getParseResult(ctx: ParameterizedContext) {
     const url = ctx.query.url as string
     const refresh = ctx.query.refresh as string
 
@@ -67,7 +40,9 @@ app.use(async (ctx, next) => {
             const { tsCode, jsCode } = codeParser(path, method)
             paths[path][method].tsCode = tsCode
             paths[path][method].jsCode = jsCode
+
             paths[path][method].mockTemplate = JSON.stringify(mockParser(path, method), null, 2)
+
             paths[path][method].mockJSON = JSON.stringify(mock(mockParser(path, method)), null, 2)
           })
         })
@@ -85,11 +60,9 @@ app.use(async (ctx, next) => {
     } catch {
       ctx.body = '请先加载接口文档'
     }
-
-    return
   }
 
-  if (ctx.path === '/swagger/mockConfig' && ctx.method === 'POST') {
+  async updateMockConfig(ctx: ParameterizedContext) {
     const {
       request: { body },
     } = ctx
@@ -109,21 +82,9 @@ app.use(async (ctx, next) => {
     } catch {
       ctx.body = '请先加载接口文档'
     }
-
-    return
   }
 
-  if (ctx.path === '/swagger/mockConfig' && ctx.method === 'GET') {
-    const { query } = ctx
-
-    if (query) {
-      ctx.body = query
-    }
-
-    return
-  }
-
-  if (ctx.path === '/swagger/writeDisk' && ctx.method === 'POST') {
+  async syncCode(ctx: ParameterizedContext) {
     const {
       request: { body },
     } = ctx
@@ -206,53 +167,24 @@ app.use(async (ctx, next) => {
         message: '请先加载接口文档',
       }
     }
-
-    return
   }
 
-  await next()
-})
-
-// mock接口
-app.use(async (ctx, next) => {
-  if (!ctx.path.startsWith('/api/') || ctx.headers['x-use-mock'] !== '1' || !ctx.headers['x-mock-type']) {
-    await next()
-
-    return
-  }
-
-  try {
-    const swaggerJSON = await loadSwaggerJSON()
-    const realPath = swaggerJSON.basePath === '/' ? ctx.path : ctx.path.substring(`/api${swaggerJSON.basePath}`.length)
-
-    if (ctx.headers['x-mock-type'] === 'mock') {
-      const mockTemplate = swaggerJSON.paths[realPath][ctx.method.toLocaleLowerCase()].mockTemplate
-
-      if (mockTemplate) {
-        await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
-        ctx.body = mock(JSON.parse(mockTemplate))
-
-        return
-      }
+  async getCodegen(ctx: ParameterizedContext) {
+    ctx.body = {
+      status: true,
+      data: (await loadConfig()).codegen?.map((d) => d.name) || [],
     }
-
-    if (ctx.headers['x-mock-type'] === 'json') {
-      const mockJSON = swaggerJSON.paths[realPath][ctx.method.toLocaleLowerCase()].mockJSON
-
-      if (mockJSON) {
-        await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
-        ctx.body = mockJSON
-
-        return
-      }
-    }
-  } catch {
-    ctx.body = '请先加载接口文档'
   }
 
-  await next()
-})
+  async transformResult(ctx: ParameterizedContext) {
+    ctx.body = {
+      status: true,
+      data:
+        (await loadConfig()).codegen
+          ?.find((d) => d.name === ctx.request.body.name)
+          ?.transform(ctx.request.body.input) || '',
+    }
+  }
+}
 
-app.listen('7788', () => {
-  console.log(`server running at: http://localhost:${7788}`)
-})
+export default new ApiController()

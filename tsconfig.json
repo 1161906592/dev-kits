@@ -1,15 +1,17 @@
 {
-  "include": ["."],
   "compilerOptions": {
+    "baseUrl": ".",
     "module": "commonjs",
     "target": "es5",
     "moduleResolution": "node",
+    "declaration": true,
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "noUnusedLocals": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
-    "outDir": "../lib"
-  }
+    "outDir": "lib",
+  },
+  "include": ["src"]
 }

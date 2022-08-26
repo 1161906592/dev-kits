@@ -1,4 +1,4 @@
-import { Definition, JavaType, Swagger } from './types'
+import { Definition, JavaType, Swagger } from '../types'
 
 type MockTemplate = Record<string, unknown>
 

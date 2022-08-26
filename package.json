@@ -1,0 +1,62 @@
+{
+  "name": "swagger-codegen",
+  "version": "0.0.1",
+  "description": "接口文档工具",
+  "main": "lib/index.js",
+  "scripts": {
+    "dev": "esno server/index.ts",
+    "build": "tsc",
+    "start": "node lib/index.js"
+  },
+  "bin": {
+    "swagger-codegen": "bin/index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1161906592/swagger-codegen.git"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "CHANGELOG.md"
+  ],
+  "keywords": [
+    "swagger-ui",
+    "openapi",
+    "java",
+    "codegen",
+    "typescript"
+  ],
+  "author": "liuyang.0826<1161906592@qq.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/1161906592/swagger-codegen/issues"
+  },
+  "devDependencies": {
+    "@celi/eslint-config": "^0.1.0",
+    "@types/babel__generator": "^7.6.4",
+    "@types/fs-extra": "^9.0.13",
+    "@types/koa": "^2.13.5",
+    "@types/koa-cors": "^0.0.2",
+    "@types/koa-router": "^7.4.4",
+    "@types/mockjs": "^1.0.6",
+    "@types/node": "^18.7.13",
+    "eslint": "^8.22.0",
+    "esno": "^0.16.3",
+    "prettier": "^2.7.1",
+    "typescript": "^4.8.2"
+  },
+  "dependencies": {
+    "@babel/generator": "^7.18.13",
+    "@babel/types": "^7.18.13",
+    "axios": "^0.27.2",
+    "esbuild": "^0.15.5",
+    "execa": "^4.0.2",
+    "fs-extra": "^10.1.0",
+    "koa": "^2.13.4",
+    "koa-body": "^5.0.0",
+    "koa-cors": "^0.0.16",
+    "koa-router": "^12.0.0",
+    "mockjs": "^1.1.0"
+  }
+}
