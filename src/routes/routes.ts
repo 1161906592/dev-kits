@@ -9,4 +9,8 @@ router.post('/mockConfig', api.updateMockConfig)
 
 router.post('/syncCode', api.syncCode)
 
+router.get('/codegen', api.getCodegen)
+
+router.post('/transformResult', api.transformResult)
+
 export default router

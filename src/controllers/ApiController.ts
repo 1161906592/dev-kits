@@ -1,11 +1,13 @@
 import axios from 'axios'
+import { render } from 'ejs'
 import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
 import { mock } from 'mockjs'
+import { format } from 'prettier'
 import { Swagger } from '../types'
 import { createCodeParser } from '../utils/codePaser'
-import { loadConfig } from '../utils/config'
+import { config } from '../utils/config'
 import { createMockParser } from '../utils/mockPaser'
 import { loadSwaggerJSON, saveSwaggerJSON } from '../utils/utils'
 
@@ -15,23 +17,12 @@ class ApiController {
     const refresh = ctx.query.refresh as string
 
     if (refresh === '1') {
-      const res = await axios.get<Swagger>(url).catch(async (e) => {
-        if (e.response?.status === 404) {
-          // 去掉basePath重试
-          const urlInst = new URL(url)
-          const pathname = urlInst.pathname
-          urlInst.pathname = '/v2/api-docs'
-          const res = await axios.get<Swagger>(urlInst.toString())
-          res.data.basePath = pathname.slice(0, -'/v2/api-docs'.length)
-
-          return res
-        }
-      })
+      const res = await axios.get<Swagger>(url)
 
       const data = res?.data
 
       if (data) {
-        const codeParser = createCodeParser(data)
+        const codeParser = createCodeParser(data, await config)
         const mockParser = createMockParser(data)
         const paths = data.paths
 
@@ -90,21 +81,18 @@ class ApiController {
     } = ctx
 
     try {
-      const swaggerJSON = await loadSwaggerJSON()
+      const [swaggerJSON, realConfig] = await Promise.all([loadSwaggerJSON(), config])
 
       const result = await Promise.all(
         (body as { path: string; method: string }[]).map(async (item) => {
           const curPath = swaggerJSON.paths[item.path as string]
-
           const tsCode = curPath[item.method as string].tsCode
 
-          let realPath = (swaggerJSON.basePath + item.path).replace(/\/+/g, '/')
+          const realPath = realConfig?.patchPath
+            ? realConfig.patchPath(item.path, swaggerJSON)
+            : `${swaggerJSON.basePath}/${item.path}`
 
-          if (!realPath.startsWith('/api/')) {
-            realPath = `/api${realPath}`
-          }
-
-          const filePath = `${process.cwd()}/src${`${realPath}${
+          const filePath = `${process.cwd()}/src${`${realConfig?.filePath ? realConfig?.filePath(realPath) : realPath}${
             Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''
           }.ts`}`
 
@@ -147,8 +135,8 @@ class ApiController {
               })
             })
         )
-      } catch (e) {
-        console.log(e)
+      } catch {
+        //
       }
 
       const disabledResult = result.filter((d) => d.status === 'disabled')
@@ -159,9 +147,7 @@ class ApiController {
           ? `${disabledResult.map((d) => `${d.method.toUpperCase()}: ${d.path}`).join('、')}禁止被覆盖已跳过`
           : '同步成功',
       }
-    } catch (e) {
-      console.log(e)
-
+    } catch {
       ctx.body = {
         status: false,
         message: '请先加载接口文档',
@@ -170,20 +156,29 @@ class ApiController {
   }
 
   async getCodegen(ctx: ParameterizedContext) {
-    ctx.body = {
-      status: true,
-      data: (await loadConfig()).codegen?.map((d) => d.name) || [],
-    }
+    const codegen = (await config)?.codegen || {}
+    ctx.body = Object.keys(codegen).map((key) => ({ key, name: codegen[key].name }))
   }
 
   async transformResult(ctx: ParameterizedContext) {
-    ctx.body = {
-      status: true,
-      data:
-        (await loadConfig()).codegen
-          ?.find((d) => d.name === ctx.request.body.name)
-          ?.transform(ctx.request.body.input) || '',
-    }
+    const { template, data } = (await config)?.codegen?.[ctx.request.body.name]?.transform(ctx.request.body.input) || {}
+
+    ctx.body = template
+      ? format(render(template, data), {
+          printWidth: 120,
+          semi: false,
+          singleQuote: true,
+          trailingComma: 'es5',
+          bracketSpacing: true,
+          jsxSingleQuote: false,
+          arrowParens: 'always',
+          proseWrap: 'never',
+          endOfLine: 'auto',
+          insertPragma: false,
+          useTabs: false,
+          parser: 'typescript',
+        }).replace(/\n\s*\n/g, '\n')
+      : ''
   }
 }
 

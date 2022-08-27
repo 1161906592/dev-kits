@@ -1,12 +1,19 @@
-import fs from 'fs'
+import * as fs from 'fs-extra'
 import { IConfig } from '..'
+import { defaultConfigFile } from '../constants'
 
-const defaultConfigFile = 'swagger.config.ts'
+export let config = loadConfig()
 
-export async function loadConfig() {
+export function updateConfig() {
+  config = loadConfig()
+}
+
+async function loadConfig() {
   const resolvedPath = `${process.cwd()}/${defaultConfigFile}`
-  if (!fs.existsSync(resolvedPath)) return {}
+  if (!fs.existsSync(resolvedPath)) return
   const bundled = await bundleConfigFile(resolvedPath)
+
+  if (!bundled) return
 
   const fileNameTmp = `${resolvedPath}.timestamp-${Date.now()}.js`
   fs.writeFileSync(fileNameTmp, bundled)
@@ -25,17 +32,21 @@ export async function loadConfig() {
 }
 
 async function bundleConfigFile(fileName: string) {
-  const result = await require('esbuild').build({
-    absWorkingDir: process.cwd(),
-    entryPoints: [fileName],
-    outfile: 'out.js',
-    write: false,
-    target: ['node14.18', 'node16'],
-    platform: 'node',
-    bundle: true,
-    format: 'cjs',
-    sourcemap: false,
-  })
+  try {
+    const result = await require('esbuild').build({
+      absWorkingDir: process.cwd(),
+      entryPoints: [fileName],
+      outfile: 'out.js',
+      write: false,
+      target: ['node14.18', 'node16'],
+      platform: 'node',
+      bundle: true,
+      format: 'cjs',
+      sourcemap: false,
+    })
 
-  return result.outputFiles[0].text
+    return result.outputFiles[0].text
+  } catch {
+    //
+  }
 }

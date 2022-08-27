@@ -26,25 +26,13 @@ import {
   Identifier,
   TSInterfaceDeclaration,
   program,
-  importSpecifier,
-  importDeclaration,
   exportDefaultDeclaration,
-  templateLiteral,
-  templateElement,
-  memberExpression,
   functionDeclaration,
   blockStatement,
-  variableDeclaration,
-  variableDeclarator,
-  awaitExpression,
-  callExpression,
-  objectExpression,
-  objectProperty,
-  ObjectProperty,
   returnStatement,
-  tsAsExpression,
-  Program,
 } from '@babel/types'
+import { render } from 'ejs'
+import { IConfig } from '..'
 import {
   Definition,
   DefinitionArrayItem,
@@ -229,6 +217,8 @@ function resolveRequestBodyInterface(definition: RequestDefinition, definitions:
     return { collector, bodyTsTypeAnnotation }
   }
 
+  let requestBody: string | undefined
+
   if (item.schema?.type === 'array') {
     if (item.schema?.items?.$ref) {
       resolveInterface(item.schema.items.$ref, definitions, collector, true)
@@ -236,12 +226,14 @@ function resolveRequestBodyInterface(definition: RequestDefinition, definitions:
 
       if (name) {
         bodyTsTypeAnnotation = tsTypeAnnotation(tsArrayType(tsTypeReference(identifier(name))))
+        requestBody = `${name}[]`
       }
     } else {
       const tsType = javaTypeToTsKeyword(item.schema.items?.type as JavaType)
 
       if (tsType) {
         bodyTsTypeAnnotation = tsTypeAnnotation(tsArrayType(tsType))
+        requestBody = `${tsType}[]`
       }
     }
   } else {
@@ -250,10 +242,11 @@ function resolveRequestBodyInterface(definition: RequestDefinition, definitions:
 
     if (name) {
       bodyTsTypeAnnotation = tsTypeAnnotation(tsTypeReference(identifier(name)))
+      requestBody = `${name}[]`
     }
   }
 
-  return { collector, bodyTsTypeAnnotation }
+  return { collector, bodyTsTypeAnnotation, requestBody }
 }
 
 function transformOperationId(operationId: string) {
@@ -283,66 +276,9 @@ function resolvePath(pathVars: string[], definition: RequestDefinition, definiti
 }
 
 function resolveExportFunction(options: ExportFunctionOptions) {
-  const {
-    parameters,
-    name,
-    path,
-    method,
-    pathInterface,
-    queryInterface,
-    bodyTsTypeAnnotation,
-    responseBody,
-    pathVars,
-  } = options
+  const { name, pathInterface, queryInterface, bodyTsTypeAnnotation } = options
 
-  const pathVariableParameters = parameters.filter((d) => d.in === 'path' || pathVars.includes(d.name))
-
-  // 处理路径参数的url
-  const urlValueNode = pathVariableParameters.length
-    ? templateLiteral(
-        path
-          .split(new RegExp(`{(?:${pathVariableParameters.map((d) => d.name).join('|')})}`))
-          .map((d, i, arr) => templateElement({ raw: d, cooked: d }, i === arr.length - 1)),
-        pathVariableParameters.map((d) => {
-          const computed = d.name.includes('-')
-
-          return memberExpression(
-            identifier('pathVariables'),
-            computed ? stringLiteral(d.name) : identifier(d.name),
-            computed
-          )
-        })
-      )
-    : stringLiteral(path)
-
-  const createBlockStatementNode = (isTs: boolean) =>
-    blockStatement([
-      variableDeclaration('const', [
-        variableDeclarator(
-          identifier('res'),
-          awaitExpression(
-            callExpression(identifier('request'), [
-              objectExpression(
-                [
-                  objectProperty(identifier('url'), urlValueNode),
-                  objectProperty(identifier('method'), stringLiteral(method)),
-                  queryInterface && objectProperty(identifier('params'), identifier('query')),
-                  bodyTsTypeAnnotation && objectProperty(identifier('data'), identifier('data'), false, true),
-                ].filter(Boolean) as ObjectProperty[]
-              ),
-            ])
-          )
-        ),
-      ]),
-      returnStatement(
-        isTs && responseBody
-          ? tsAsExpression(
-              memberExpression(identifier('res'), identifier('data')),
-              tsTypeReference(identifier(responseBody))
-            )
-          : memberExpression(identifier('res'), identifier('data'))
-      ),
-    ])
+  const functionBody = blockStatement([returnStatement(identifier('__function_body__'))])
 
   const tsApiFunctionNode = functionDeclaration(
     identifier(name),
@@ -360,7 +296,7 @@ function resolveExportFunction(options: ExportFunctionOptions) {
         typeAnnotation: bodyTsTypeAnnotation,
       },
     ].filter(Boolean) as Identifier[],
-    createBlockStatementNode(true),
+    functionBody,
     false,
     true
   )
@@ -372,7 +308,7 @@ function resolveExportFunction(options: ExportFunctionOptions) {
       queryInterface && identifier('query'),
       bodyTsTypeAnnotation && identifier('data'),
     ].filter(Boolean) as Identifier[],
-    createBlockStatementNode(false),
+    functionBody,
     false,
     true
   )
@@ -380,19 +316,19 @@ function resolveExportFunction(options: ExportFunctionOptions) {
   return { tsApiFunctionNode, jsApiFunctionNode }
 }
 
-function resolveProgram(
-  paths: Paths,
-  path: string,
-  method: string,
-  definitions: Record<string, Definition>,
-  basePath: string
-) {
+function resolveProgram(paths: Paths, path: string, method: string, definitions: Record<string, Definition>) {
   const definition = paths[path][method]
   const name = transformOperationId(definition.operationId)
   const pathVars = path.match(/\{(.+?)\}/g)?.map((d) => d.slice(1, -1)) || []
   const pathExports = resolvePath(pathVars, definition, definitions)
   const queryExports = resolveQuery(pathVars, definition, definitions)
-  const { collector: requestBodyExports, bodyTsTypeAnnotation } = resolveRequestBodyInterface(definition, definitions)
+
+  const {
+    collector: requestBodyExports,
+    bodyTsTypeAnnotation,
+    requestBody,
+  } = resolveRequestBodyInterface(definition, definitions)
+
   const responseBodyExports = resolveResponseBodyInterface(definition, definitions)
   const pathInterface = (pathExports[pathExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
   const queryInterface = (queryExports[queryExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
@@ -400,22 +336,11 @@ function resolveProgram(
   const responseBody = (responseBodyExports[responseBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
     .name
 
-  let realPath = (basePath + path).replace(/\/+/g, '/')
-
-  if (!realPath.startsWith('/api/')) {
-    realPath = `/api${realPath}`
-  }
-
   const { tsApiFunctionNode, jsApiFunctionNode } = resolveExportFunction({
-    parameters: definition.parameters || [],
     name,
-    path: realPath,
-    method,
     pathInterface,
     queryInterface,
     bodyTsTypeAnnotation,
-    responseBody,
-    pathVars,
   })
 
   // 函数注释
@@ -428,7 +353,6 @@ function resolveProgram(
 
   const tsProgram = program(
     [
-      importDeclaration([importSpecifier(identifier('request'), identifier('request'))], stringLiteral('@celi/shared')),
       pathExports,
       queryExports,
       requestBodyExports,
@@ -438,34 +362,51 @@ function resolveProgram(
     ].flat()
   )
 
-  const jsProgram = program(
-    [
-      importDeclaration([importSpecifier(identifier('request'), identifier('request'))], stringLiteral('@celi/shared')),
-      jsApiFunctionNode,
-      exportDefaultDeclaration(identifier(name)),
-    ].flat()
-  )
+  const jsProgram = program([jsApiFunctionNode, exportDefaultDeclaration(identifier(name))].flat())
 
-  return { tsProgram, jsProgram }
+  return { tsProgram, jsProgram, responseBody, queryInterface, pathInterface, requestBody }
 }
 
-function generateCode(program: Program) {
-  return generate(program).code.replace(/\n\n/g, '\n').replace(/;/g, '')
-}
+export function createCodeParser(swaggerJSON: Swagger, config?: IConfig) {
+  const { patchPath, apiBeforeCode = '', apiFunctionCode = '' } = config || {}
 
-export function createCodeParser(swaggerJSON: Swagger) {
   return (path: string, method: string) => {
-    const { tsProgram, jsProgram } = resolveProgram(
+    const { tsProgram, jsProgram, responseBody, queryInterface, pathInterface, requestBody } = resolveProgram(
       swaggerJSON.paths,
       path,
       method,
-      swaggerJSON.definitions,
-      swaggerJSON.basePath
+      swaggerJSON.definitions
     )
 
+    const fullPath = (patchPath ? patchPath(path, swaggerJSON) : `${swaggerJSON.basePath}/${path}`).replace(/\/+/g, '/')
+
+    const realPath = pathInterface ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVariables.$1}`)}\`` : `"${fullPath}"`
+
     return {
-      tsCode: generateCode(tsProgram),
-      jsCode: generateCode(jsProgram),
+      tsCode: `${apiBeforeCode}\n${generate(tsProgram)
+        .code.replace(
+          'return __function_body__',
+          render(apiFunctionCode, {
+            path: realPath,
+            responseBody,
+            query: queryInterface,
+            data: requestBody,
+          })
+        )
+        .replace(/;/g, '')
+        .replace(/\n\s*\n/g, '\n')}`,
+      jsCode: `${apiBeforeCode}\n${generate(jsProgram)
+        .code.replace(
+          'return __function_body__',
+          render(apiFunctionCode, {
+            path: realPath,
+            responseBody: null,
+            query: queryInterface,
+            data: requestBody,
+          })
+        )
+        .replace(/;/g, '')
+        .replace(/\n\s*\n/g, '\n')}`,
     }
   }
 }

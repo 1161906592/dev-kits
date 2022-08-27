@@ -74,19 +74,24 @@ export interface Tag {
 
 export interface Swagger {
   basePath: string
-  tags: Tag[]
-  paths: Paths
   definitions: Record<string, Definition>
+  host: string
+  paths: Paths
+  swagger: string
+  tags: Tag[]
 }
 
 export interface ExportFunctionOptions {
-  parameters: Parameter[]
   name: string
-  path: string
-  method: string
   pathInterface?: string
   queryInterface?: string
   bodyTsTypeAnnotation?: TSTypeAnnotation
-  responseBody?: string
-  pathVars: string[]
+}
+
+export interface ParseResult {
+  key: string
+  type: string
+  required: boolean
+  title?: string
+  meta?: string
 }
