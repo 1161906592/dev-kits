@@ -95,3 +95,16 @@ export interface ParseResult {
   title?: string
   meta?: string
 }
+
+export interface PropItem {
+  name: string
+  required: boolean
+  type: string
+  description?: string
+  format?: string
+}
+
+export interface InterfaceItem {
+  name: string
+  props: PropItem[]
+}

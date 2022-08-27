@@ -1,29 +1,42 @@
 import { defineConfig, parseInterface } from '@celi/swagger-codegen'
 
 export default defineConfig({
-  patchPath: (path, data) => {
-    const port = data.host.split(':')[1]
+  // patchPath: (path, data) => {
+  //   const port = data.host.split(':')[1]
 
-    const basePathMap = {
-      9001: '/',
-      9004: '/xg-mes-production',
-    }
+  //   const basePathMap = {
+  //     9001: '/',
+  //     9004: '/xg-mes-production',
+  //   }
 
-    return `/api${basePathMap[port]}/${path}`
-  },
-  apiBeforeCode: `import { request } from "@celi/shared"`,
-  apiFunctionCode: `
-  const res = await request({
-    url: <%- path %>,
-    <% if(query) { %>
-    params: query,
-    <% } %>
-    <% if(data) { %>
-    data,
-    <% } %>
-  })
-  return res.data<% if(responseBody) { %> as <%- responseBody %> <% } %>
-  `,
+  //   return `/api${basePathMap[port]}/${path}`
+  // },
+  apiTemplate: `
+  import { request } from "@celi/shared"
+  
+  <% interfaces.forEach(function(item){ %>
+  export interface <%- item.name %> {
+    <% item.props.forEach(function(prop){ %>
+      <%- prop.name %><% if (prop.required) { %>?<% } %>: <%- prop.type %><% if (prop.description || prop.format) { %>// <% } %><% if (prop.description) { %><%- prop.description %> <% } %><% if (prop.format) { %><%- prop.format %> <% } %>
+    <% }); %>
+  }
+  <% }); %>
+  
+  <% if (comment) { %>// <%- comment %><% } %>
+  async function <%- name %>(<%- args %>) {
+    const res = await request({
+      url: <%- path %>,
+      method: <%- method %>,
+      <% if(query) { %>
+      params: query,
+      <% } %>
+      <% if(data) { %>
+      data,
+      <% } %>
+    })
+    return res.data<% if(responseBody) { %> as <%- responseBody %> <% } %>
+  }
+  export default <%- name %>`,
   codegen: {
     1: {
       name: '表格列',

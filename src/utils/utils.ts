@@ -1,4 +1,5 @@
 import * as fs from 'fs-extra'
+import { format } from 'prettier'
 import { dataDir } from '../constants'
 import { ParseResult, Swagger } from '../types'
 
@@ -42,4 +43,21 @@ export function parseInterface(input: string) {
       }
     })
     .filter((d) => d) || []) as ParseResult[]
+}
+
+export function formatCode(code: string) {
+  return format(code, {
+    printWidth: 120,
+    semi: false,
+    singleQuote: true,
+    trailingComma: 'es5',
+    bracketSpacing: true,
+    jsxSingleQuote: false,
+    arrowParens: 'always',
+    proseWrap: 'never',
+    endOfLine: 'auto',
+    insertPragma: false,
+    useTabs: false,
+    parser: 'typescript',
+  }).replace(/\n\s*\n/g, '\n')
 }

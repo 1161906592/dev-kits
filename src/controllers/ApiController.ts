@@ -4,12 +4,11 @@ import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
 import { mock } from 'mockjs'
-import { format } from 'prettier'
 import { Swagger } from '../types'
 import { createCodeParser } from '../utils/codePaser'
 import { config } from '../utils/config'
 import { createMockParser } from '../utils/mockPaser'
-import { loadSwaggerJSON, saveSwaggerJSON } from '../utils/utils'
+import { formatCode, loadSwaggerJSON, saveSwaggerJSON } from '../utils/utils'
 
 class ApiController {
   async getParseResult(ctx: ParameterizedContext) {
@@ -18,7 +17,6 @@ class ApiController {
 
     if (refresh === '1') {
       const res = await axios.get<Swagger>(url)
-
       const data = res?.data
 
       if (data) {
@@ -163,22 +161,7 @@ class ApiController {
   async transformResult(ctx: ParameterizedContext) {
     const { template, data } = (await config)?.codegen?.[ctx.request.body.name]?.transform(ctx.request.body.input) || {}
 
-    ctx.body = template
-      ? format(render(template, data), {
-          printWidth: 120,
-          semi: false,
-          singleQuote: true,
-          trailingComma: 'es5',
-          bracketSpacing: true,
-          jsxSingleQuote: false,
-          arrowParens: 'always',
-          proseWrap: 'never',
-          endOfLine: 'auto',
-          insertPragma: false,
-          useTabs: false,
-          parser: 'typescript',
-        }).replace(/\n\s*\n/g, '\n')
-      : ''
+    ctx.body = template ? formatCode(render(template, data)) : ''
   }
 }
 

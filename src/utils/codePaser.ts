@@ -1,105 +1,49 @@
-import generate from '@babel/generator'
-import {
-  tsInterfaceBody,
-  identifier,
-  tsPropertySignature,
-  tsTypeAnnotation,
-  tsStringKeyword,
-  addComment,
-  tsNumberKeyword,
-  tsTypeReference,
-  TSTypeElement,
-  tsArrayType,
-  TSStringKeyword,
-  TSNumberKeyword,
-  TSArrayType,
-  tsBooleanKeyword,
-  TSBooleanKeyword,
-  stringLiteral,
-  tsObjectKeyword,
-  TSObjectKeyword,
-  TSTypeAnnotation,
-  exportNamedDeclaration,
-  tsInterfaceDeclaration,
-  ExportNamedDeclaration,
-  TSTypeReference,
-  Identifier,
-  TSInterfaceDeclaration,
-  program,
-  exportDefaultDeclaration,
-  functionDeclaration,
-  blockStatement,
-  returnStatement,
-} from '@babel/types'
 import { render } from 'ejs'
 import { IConfig } from '..'
 import {
   Definition,
   DefinitionArrayItem,
-  ExportFunctionOptions,
+  InterfaceItem,
   JavaType,
   Parameter,
   Paths,
+  PropItem,
   RequestDefinition,
   Swagger,
 } from '../types'
-import { matchInterfaceName } from './utils'
+import { formatCode, matchInterfaceName } from './utils'
 
-function makeTsPropertySignature(name: string, tsTypeAnnotation: TSTypeAnnotation) {
-  return tsPropertySignature(name.includes('-') ? stringLiteral(name) : identifier(name), tsTypeAnnotation)
+function fixName(name: string) {
+  return name.includes('-') ? `"${name}"` : name
 }
 
-function javaTypeToTsKeyword(
-  javaType: JavaType,
-  item?: DefinitionArrayItem
-): TSStringKeyword | TSNumberKeyword | TSBooleanKeyword | TSArrayType | TSObjectKeyword | void {
-  if (javaType === 'string') {
-    return tsStringKeyword()
-  }
+function javaTypeToTsKeyword(javaType: JavaType, item?: DefinitionArrayItem): string | void {
+  if (['number', 'integer'].includes(javaType)) return 'number'
 
-  if (['number', 'integer'].includes(javaType)) {
-    return tsNumberKeyword()
-  }
-
-  if (javaType === 'boolean') {
-    return tsBooleanKeyword()
-  }
-
-  if (javaType === 'object') {
-    return tsObjectKeyword()
-  }
+  if (['string', 'boolean', 'object'].includes(javaType)) return javaType
 
   if (javaType === 'array') {
-    const tsKeyword = item?.$ref
-      ? tsTypeReference(identifier(item.$ref))
-      : item?.type
-      ? javaTypeToTsKeyword(item?.type)
-      : null
+    const tsKeyword = item?.$ref ? item.$ref : item?.type ? javaTypeToTsKeyword(item.type) : null
 
-    if (tsKeyword) {
-      return tsArrayType(tsKeyword)
-    }
+    if (tsKeyword) return `${tsKeyword}[]`
   }
 }
 
 function resolveInterface(
   ref: string,
   definitions: Record<string, Definition>,
-  collector: ExportNamedDeclaration[],
+  collector: InterfaceItem[],
   markRequired: boolean
 ) {
-  if (!ref) return
   const interfaceName = matchInterfaceName(ref)
-  if (collector.some((d) => (d.declaration as TSInterfaceDeclaration).id.name === interfaceName)) return
+  if (collector.some((d) => d.name === interfaceName)) return
   const { properties, required = [] } = definitions[ref.substring('#/definitions/'.length)] || {}
   if (!properties) return
-
-  const interfaceBody: Array<TSTypeElement> = []
+  const interfaceBody: PropItem[] = []
 
   Object.keys(properties).forEach((propName) => {
     const { type, $ref, description, format, items } = properties[propName]
-
-    const tsKeyword = $ref ? tsTypeReference(identifier($ref)) : type ? javaTypeToTsKeyword(type, items) : null
+    const tsKeyword = $ref ? $ref : type ? javaTypeToTsKeyword(type, items) : null
 
     if (!tsKeyword) {
       console.log(`the ${propName} attribute of the ${$ref} is ignored`)
@@ -107,29 +51,25 @@ function resolveInterface(
       return
     }
 
-    const node = {
-      ...makeTsPropertySignature(propName, tsTypeAnnotation(tsKeyword)),
-      optional: !markRequired || !required.includes(propName),
-    }
-
-    interfaceBody.push(
-      description ? addComment(node, 'trailing', ` ${description}${format ? ` ${format}` : ''}`, true) : node
-    )
+    interfaceBody.push({
+      name: fixName(propName),
+      required: markRequired && required.includes(propName),
+      type: tsKeyword || '',
+      description,
+      format,
+    })
   })
 
-  collector.unshift(
-    exportNamedDeclaration(
-      tsInterfaceDeclaration(identifier(interfaceName), null, null, tsInterfaceBody(interfaceBody))
-    )
-  )
+  collector.unshift({
+    name: interfaceName,
+    props: interfaceBody,
+  })
 
   interfaceBody.forEach((item) => {
-    const refIdentifier = (((item.typeAnnotation?.typeAnnotation as TSArrayType).elementType as TSTypeReference)
-      ?.typeName || (item.typeAnnotation?.typeAnnotation as TSTypeReference)?.typeName) as Identifier
-
-    if (refIdentifier?.name) {
-      resolveInterface(refIdentifier.name, definitions, collector, markRequired)
-      refIdentifier.name = matchInterfaceName(refIdentifier.name)
+    if (item.type.startsWith('#/definitions')) {
+      const ref = item.type.split(/(\[.*\])?$/)[0]
+      resolveInterface(ref, definitions, collector, markRequired)
+      item.type = item.type.replace(/.*?(\[.*\])?$/, `${matchInterfaceName(item.type)}$1`)
     }
   })
 }
@@ -145,15 +85,13 @@ function resolveQueryOrPath(
   resolveType: 'query' | 'path',
   definitions: Record<string, Definition>
 ) {
-  const collector: ExportNamedDeclaration[] = []
+  const collector: InterfaceItem[] = []
+  const interfaceBody: PropItem[] = []
 
-  const interfaceBody: Array<TSTypeElement> = []
-
-  const interfaceName =
-    toFirstUpperCase(name) + toFirstUpperCase(resolveType === 'path' ? 'pathVariables' : resolveType)
+  const interfaceName = toFirstUpperCase(name) + toFirstUpperCase(resolveType === 'path' ? 'pathVariable' : resolveType)
 
   parameters.forEach((parameter) => {
-    const { name, description, required, type, schema } = parameter
+    const { name, description, required, type, schema, format } = parameter
     if (schema?.$ref || (schema?.type === 'array' && parameter.in !== 'query')) return // 复杂类型在requestBody
     if (resolveType === 'query' && pathVars.includes(name)) return // pathVars
     if (resolveType === 'path' && !(parameter.in !== 'path' && pathVars.includes(name))) return // query
@@ -163,7 +101,7 @@ function resolveQueryOrPath(
     }
 
     const tsKeyword = schema?.$ref
-      ? tsTypeReference(identifier(schema?.$ref))
+      ? schema.$ref
       : type || schema?.type
       ? javaTypeToTsKeyword(type || schema?.type, schema?.items)
       : null
@@ -174,79 +112,62 @@ function resolveQueryOrPath(
       return
     }
 
-    const node = {
-      ...makeTsPropertySignature(name, tsTypeAnnotation(tsKeyword)),
-      optional: !required,
-    }
-
-    interfaceBody.push(description ? addComment(node, 'trailing', ` ${description}`, true) : node)
+    interfaceBody.push({
+      name: fixName(name),
+      required,
+      type: tsKeyword || '',
+      description,
+      format,
+    })
   })
 
-  if (!interfaceBody.length) {
-    return []
-  }
-
-  collector.push(
-    exportNamedDeclaration(
-      tsInterfaceDeclaration(identifier(interfaceName), null, null, tsInterfaceBody(interfaceBody))
-    )
-  )
+  interfaceBody.length &&
+    collector.push({
+      name: interfaceName,
+      props: interfaceBody,
+    })
 
   return collector
 }
 
 function resolveResponseBodyInterface(definition: RequestDefinition, definitions: Record<string, Definition>) {
   const $ref = definition.responses[200].schema?.$ref
-
-  const collector: ExportNamedDeclaration[] = []
-
-  if ($ref) {
-    resolveInterface($ref, definitions, collector, false)
-  }
+  const collector: InterfaceItem[] = []
+  $ref && resolveInterface($ref, definitions, collector, false)
 
   return collector
 }
 
 function resolveRequestBodyInterface(definition: RequestDefinition, definitions: Record<string, Definition>) {
-  const collector: ExportNamedDeclaration[] = []
-  let bodyTsTypeAnnotation: TSTypeAnnotation | undefined = undefined
+  const collector: InterfaceItem[] = []
 
   const item = definition.parameters?.find((d) => d.in === 'body' && (d.schema?.$ref || d.schema?.type === 'array'))
 
-  if (!item) {
-    return { collector, bodyTsTypeAnnotation }
-  }
+  if (!item) return { collector }
 
   let requestBody: string | undefined
 
   if (item.schema?.type === 'array') {
     if (item.schema?.items?.$ref) {
       resolveInterface(item.schema.items.$ref, definitions, collector, true)
-      const name = (collector[collector.length - 1].declaration as TSInterfaceDeclaration)?.id.name
+      const name = collector.at(-1)?.name
 
       if (name) {
-        bodyTsTypeAnnotation = tsTypeAnnotation(tsArrayType(tsTypeReference(identifier(name))))
         requestBody = `${name}[]`
       }
     } else {
       const tsType = javaTypeToTsKeyword(item.schema.items?.type as JavaType)
 
       if (tsType) {
-        bodyTsTypeAnnotation = tsTypeAnnotation(tsArrayType(tsType))
         requestBody = `${tsType}[]`
       }
     }
   } else {
     resolveInterface(item.schema?.$ref as string, definitions, collector, true)
-    const name = (collector[collector.length - 1].declaration as TSInterfaceDeclaration)?.id.name
-
-    if (name) {
-      bodyTsTypeAnnotation = tsTypeAnnotation(tsTypeReference(identifier(name)))
-      requestBody = `${name}[]`
-    }
+    requestBody = collector.at(-1)?.name
   }
 
-  return { collector, bodyTsTypeAnnotation, requestBody }
+  return { collector, requestBody }
 }
 
 function transformOperationId(operationId: string) {
@@ -275,138 +196,93 @@ function resolvePath(pathVars: string[], definition: RequestDefinition, definiti
   )
 }
 
-function resolveExportFunction(options: ExportFunctionOptions) {
-  const { name, pathInterface, queryInterface, bodyTsTypeAnnotation } = options
-
-  const functionBody = blockStatement([returnStatement(identifier('__function_body__'))])
-
-  const tsApiFunctionNode = functionDeclaration(
-    identifier(name),
-    [
-      pathInterface && {
-        ...identifier('pathVariables'),
-        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(pathInterface))),
-      },
-      queryInterface && {
-        ...identifier('query'),
-        typeAnnotation: tsTypeAnnotation(tsTypeReference(identifier(queryInterface))),
-      },
-      bodyTsTypeAnnotation && {
-        ...identifier('data'),
-        typeAnnotation: bodyTsTypeAnnotation,
-      },
-    ].filter(Boolean) as Identifier[],
-    functionBody,
-    false,
-    true
-  )
-
-  const jsApiFunctionNode = functionDeclaration(
-    identifier(name),
-    [
-      pathInterface && identifier('pathVariables'),
-      queryInterface && identifier('query'),
-      bodyTsTypeAnnotation && identifier('data'),
-    ].filter(Boolean) as Identifier[],
-    functionBody,
-    false,
-    true
-  )
-
-  return { tsApiFunctionNode, jsApiFunctionNode }
-}
-
 function resolveProgram(paths: Paths, path: string, method: string, definitions: Record<string, Definition>) {
   const definition = paths[path][method]
   const name = transformOperationId(definition.operationId)
   const pathVars = path.match(/\{(.+?)\}/g)?.map((d) => d.slice(1, -1)) || []
-  const pathExports = resolvePath(pathVars, definition, definitions)
-  const queryExports = resolveQuery(pathVars, definition, definitions)
 
-  const {
-    collector: requestBodyExports,
-    bodyTsTypeAnnotation,
-    requestBody,
-  } = resolveRequestBodyInterface(definition, definitions)
+  const pathInterfaces = resolvePath(pathVars, definition, definitions)
+  const pathVariable = pathInterfaces.at(-1)?.name
 
-  const responseBodyExports = resolveResponseBodyInterface(definition, definitions)
-  const pathInterface = (pathExports[pathExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
-  const queryInterface = (queryExports[queryExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id.name
+  const queryInterfaces = resolveQuery(pathVars, definition, definitions)
+  const query = queryInterfaces.at(-1)?.name
 
-  const responseBody = (responseBodyExports[responseBodyExports.length - 1]?.declaration as TSInterfaceDeclaration)?.id
-    .name
+  const { collector: requestBodyInterfaces, requestBody } = resolveRequestBodyInterface(definition, definitions)
 
-  const { tsApiFunctionNode, jsApiFunctionNode } = resolveExportFunction({
-    name,
-    pathInterface,
-    queryInterface,
-    bodyTsTypeAnnotation,
-  })
+  const responseBodyInterfaces = resolveResponseBodyInterface(definition, definitions)
+  const responseBody = responseBodyInterfaces.at(-1)?.name
 
-  // 函数注释
   const { summary, description } = definition
+  const comment = [summary, description].filter(Boolean).join(', ')
 
-  if (summary || description) {
-    addComment(tsApiFunctionNode, 'leading', ` ${[summary, description].filter(Boolean).join(', ')}`, true)
-    addComment(jsApiFunctionNode, 'leading', ` ${[summary, description].filter(Boolean).join(', ')}`, true)
+  return {
+    name,
+    comment,
+    requestBodyInterfaces,
+    requestBody,
+    pathInterfaces,
+    pathVariable,
+    queryInterfaces,
+    query,
+    responseBodyInterfaces,
+    responseBody,
   }
+}
 
-  const tsProgram = program(
-    [
-      pathExports,
-      queryExports,
-      requestBodyExports,
-      responseBodyExports,
-      tsApiFunctionNode,
-      exportDefaultDeclaration(identifier(name)),
-    ].flat()
-  )
-
-  const jsProgram = program([jsApiFunctionNode, exportDefaultDeclaration(identifier(name))].flat())
-
-  return { tsProgram, jsProgram, responseBody, queryInterface, pathInterface, requestBody }
+function renderApiCode(apiTemplate: string, data: Record<string, unknown>) {
+  return formatCode(render(apiTemplate, data))
 }
 
 export function createCodeParser(swaggerJSON: Swagger, config?: IConfig) {
-  const { patchPath, apiBeforeCode = '', apiFunctionCode = '' } = config || {}
+  const { patchPath, apiTemplate = '' } = config || {}
 
   return (path: string, method: string) => {
-    const { tsProgram, jsProgram, responseBody, queryInterface, pathInterface, requestBody } = resolveProgram(
-      swaggerJSON.paths,
-      path,
-      method,
-      swaggerJSON.definitions
-    )
+    const {
+      name,
+      comment,
+      pathInterfaces,
+      pathVariable,
+      queryInterfaces,
+      query,
+      requestBodyInterfaces,
+      requestBody,
+      responseBodyInterfaces,
+      responseBody,
+    } = resolveProgram(swaggerJSON.paths, path, method, swaggerJSON.definitions)
 
     const fullPath = (patchPath ? patchPath(path, swaggerJSON) : `${swaggerJSON.basePath}/${path}`).replace(/\/+/g, '/')
 
-    const realPath = pathInterface ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVariables.$1}`)}\`` : `"${fullPath}"`
+    const realPath = pathVariable ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVariable["$1"]}`)}\`` : `"${fullPath}"`
 
     return {
-      tsCode: `${apiBeforeCode}\n${generate(tsProgram)
-        .code.replace(
-          'return __function_body__',
-          render(apiFunctionCode, {
-            path: realPath,
-            responseBody,
-            query: queryInterface,
-            data: requestBody,
-          })
-        )
-        .replace(/;/g, '')
-        .replace(/\n\s*\n/g, '\n')}`,
-      jsCode: `${apiBeforeCode}\n${generate(jsProgram)
-        .code.replace(
-          'return __function_body__',
-          render(apiFunctionCode, {
-            path: realPath,
-            responseBody: null,
-            query: queryInterface,
-            data: requestBody,
-          })
-        )
-        .replace(/;/g, '')
-        .replace(/\n\s*\n/g, '\n')}`,
+      tsCode: renderApiCode(apiTemplate, {
+        name,
+        comment,
+        interfaces: [...pathInterfaces, ...queryInterfaces, ...requestBodyInterfaces, ...responseBodyInterfaces],
+        args: [
+          pathVariable && `pathVariable: ${pathVariable}`,
+          query && `query: ${query}`,
+          requestBody && `data: ${requestBody}`,
+        ]
+          .filter(Boolean)
+          .join(', '),
+        path: realPath,
+        method: `"${method}"`,
+        responseBody,
+        query,
+        data: requestBody,
+      }),
+      jsCode: renderApiCode(apiTemplate, {
+        name,
+        comment,
+        interfaces: [],
+        args: [pathVariable && 'pathVariable', query && 'query', requestBody && 'data'].filter(Boolean).join(', '),
+        path: realPath,
+        method: `"${method}"`,
+        responseBody: null,
+        query,
+        data: requestBody,
+      }),
     }
   }
 }
