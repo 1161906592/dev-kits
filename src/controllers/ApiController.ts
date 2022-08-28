@@ -155,11 +155,17 @@ class ApiController {
 
   async getCodegen(ctx: ParameterizedContext) {
     const codegen = (await config)?.codegen || {}
-    ctx.body = Object.keys(codegen).map((key) => ({ key, name: codegen[key].name }))
+
+    ctx.body = Object.keys(codegen).map((key) => ({
+      key,
+      name: codegen[key].name,
+      options: codegen[key].options || [],
+    }))
   }
 
   async transformResult(ctx: ParameterizedContext) {
-    const { template, data } = (await config)?.codegen?.[ctx.request.body.name]?.transform(ctx.request.body.input) || {}
+    const { template, data } =
+      (await config)?.codegen?.[ctx.request.body.key]?.transform(ctx.request.body.input, ctx.request.body.options) || {}
 
     ctx.body = template ? formatCode(render(template, data)) : ''
   }

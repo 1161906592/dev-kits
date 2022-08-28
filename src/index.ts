@@ -2,7 +2,14 @@ import { Swagger } from './types'
 
 export interface Codegen {
   name: string
-  transform(input: string): {
+  options?: {
+    label: string
+    value: string
+  }[]
+  transform(
+    input: string,
+    options: string[]
+  ): {
     template: string
     data?: Record<string, unknown>
   }
@@ -18,7 +25,3 @@ export interface IConfig {
 export function defineConfig(config: IConfig) {
   return config
 }
-
-export { parseInterface } from './utils/utils'
-
-export type { ParseResult } from './types'

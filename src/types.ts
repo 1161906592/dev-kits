@@ -1,5 +1,3 @@
-import { TSTypeAnnotation } from '@babel/types'
-
 export type JavaBaseType = 'integer' | 'number' | 'string' | 'boolean'
 
 export type JavaType = JavaBaseType | 'array' | 'object'
@@ -79,21 +77,6 @@ export interface Swagger {
   paths: Paths
   swagger: string
   tags: Tag[]
-}
-
-export interface ExportFunctionOptions {
-  name: string
-  pathInterface?: string
-  queryInterface?: string
-  bodyTsTypeAnnotation?: TSTypeAnnotation
-}
-
-export interface ParseResult {
-  key: string
-  type: string
-  required: boolean
-  title?: string
-  meta?: string
 }
 
 export interface PropItem {

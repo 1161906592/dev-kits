@@ -1,0 +1,340 @@
+<script>
+import { DataTableColumns } from "naive-ui"
+
+export const XXX = defineComponent({
+  setup() {
+    // 获取数据
+    <% if (isPageSearch) { %>
+    const {
+      loadingRef,
+      pagination: {
+        pageRef,
+        pageSizeRef,
+        recordsRef,
+        totalRef,
+        <% if (queryFields.length) { %>
+        modelRef,
+        handleSubmit,
+        handleReset,
+        <% } %>
+        updatePage,
+        updatePageSize,
+      },
+    } = usePaginationLogic(async (currentPage, pageSize, query) => {
+        const res = await <%- name %>({
+          currentPage,
+          pageSize,
+          query
+        })
+
+        return res.content
+      }, {
+      model: () => ({
+        <% queryFields.forEach(function(item){ %>
+          <%- item.key %>: null, // <%- item.title %>
+        <% }) %>
+      }),
+      defaultPageSize: 10
+    })
+    <% } else { %>
+    const {
+      loadingRef,
+      submit: { modelRef, handleSubmit },
+    } = useSubmitLogic(
+      async (query) => {
+        const res = await <%- name %>({
+          ...query
+        })
+
+        return res.content
+      },
+      {
+        <% if (queryType) { %>
+        model: () => ({
+          <% queryFields.forEach(function(item){ %>
+            <%- item.key %>: null, // <%- item.title %>
+          <% }) %>
+        } as PartialNull<<%- queryType %>>),
+        <% } else { %>
+        model: () => null,
+        <% } %>
+      }
+    )
+    <% } %> 
+
+    <% if (options.includes("delete")) { %>
+    // 删除
+    const { run: handleDelate } = useRequestLogic(
+      async (id: string) => {
+        const res = await deleteXXX({
+          version: version as string,
+        })
+        return res.content
+      },
+      {
+        manual: true,
+        onSuccess() {
+          perferMessage.success('删除成功')
+          handleSubmit()
+        }
+      }
+    )
+    <% } %> 
+
+    // 表格列
+    const columns: DataTableColumns<<%- rowType %>> = [
+      <% columns.forEach(function(item){ %>
+        { key: '<%- item.key %>', title: '<%- item.title %>' },
+      <% }) %>
+      <% if (options.includes("update") || options.includes("delete")) { %>
+        {
+          key: "action",
+          title: "操作",
+          render: (row) => (
+            <>
+              <%- [
+                options.includes("update") && `
+                <NButton text type="primary" onClick={() => handleEdit(row)}>
+                  编辑
+                </NButton>
+                `,
+                options.includes("delete") && `
+                <NPopconfirm
+                  onPositiveClick={() => handleDelate(row.id)}
+                  v-slots={{
+                    trigger: () => (
+                      <NButton text type="primary">
+                        删除
+                      </NButton>
+                    ),
+                  }}
+                >
+                  确认删除?
+                </NPopconfirm>
+                `
+              ].filter(Boolean).join("<NDivider vertical />") %>
+            </>
+          )
+        }
+      <% } %>
+    ]
+    
+    <% if (options.includes("add") || options.includes("update")) { %>
+    // 新增 编辑
+    const { showRef, titleRef, dataRef: modalDataRef <% if (options.includes("add")) { %>, handleAdd <% } %><% if (options.includes("update")) { %>, handleEdit <% } %>} = useModalCtrlLogic<<%- rowType %>>()
+    <% } %> 
+
+    const rowKey = (row: <%- rowType %>) => row.xxx
+
+    return (
+      <>
+        <% if (queryFields.length || options.includes("add")) { %>
+          <NForm labelPlacement="left">
+            <CSearchLayout
+              <% if (queryFields.length) { %>
+              onSearch={handleSubmit}
+              onReset={handleReset}
+              <% } %> 
+              v-slots={{
+                handles: () => (
+                  <>
+                    <NButton
+                      type="primary"
+                      v-slots={{
+                        icon: () => (
+                          <NIcon>
+                            <Add />
+                          </NIcon>
+                        ),
+                      }}
+                      onClick={handleAdd}
+                    >
+                      新增
+                    </NButton>
+                  </>
+                )
+              }}
+            >
+              <% queryFields.forEach(function(item){ %>
+                <NFormItem label="<%- item.title %>:">
+                  <<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %> v-model:value={modelRef.value.<%- item.key %>}></<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>>
+                </NFormItem>
+              <% }) %>
+            </CSearchLayout>
+          </NForm>
+        <% } %>
+        <NDataTable
+          class="un-mt-12px"
+          columns={columns}
+          data={recordsRef.value}
+          loading={loadingRef.value}
+          rowKey={rowKey}
+          flexHeight
+        />
+        <% if (isPageSearch) { %>
+        <div class="un-flex un-justify-end un-mt-12px">
+          <NPagination
+            itemCount={totalRef.value}
+            pageSize={pageSizeRef.value}
+            page={pageRef.value}
+            pageSlot={7}
+            showSizePicker
+            pageSizes={[10, 20, 50, 100]}
+            onUpdatePage={updatePage}
+            onUpdatePageSize={updatePageSize}
+          >
+            {{ prefix: () => `总${totalRef.value}条` }}
+          </NPagination>
+        </div>
+        <% } %>
+        <% if (options.includes("add") || options.includes("update")) { %>
+        <XXXModal v-model:show={showRef.value} data={modalDataRef.value} onUpdate={handleSubmit} />
+        <% } %> 
+      </>
+    )
+  }
+})
+
+<% if (options.includes("add") || options.includes("update")) { %>
+/**
+ * 表单数据类型
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ */
+export interface ModalFormModel extends Omit<<%- rowType %>, <%- formModelFields.map(d => `"${d.key}"`).join("|") %> > {
+  <% formModelFields.forEach(function(item){ %>
+    <%- item.key %>: <%- item.meta?.includes('date-time') ? 'number' : 'string' %><% if(item.title) { %> // <%- item.title %><% } %>
+  <% }); %>
+}
+
+/**
+ * 弹窗组件代码
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ */
+import { FormInst } from "naive-ui"
+export const XXXModal = defineComponent({
+  props: {
+    ...createModalProps<<%- rowType %>>(),
+  },
+  setup(props) {
+    const formInstRef = ref<FormInst | null>(null)
+    // 表单校验规则
+    const rules: FormRules = {
+      <% formFields.forEach(function(item){ %>
+        <%- item.key %>: { required: true, trigger: 'input', message: '请<%- item.meta?.includes('date-time') ? '选择' : '输入' %><%- item.title %>' },
+      <% }); %>
+    }
+
+    // 提交表单
+    const {
+      loadingRef,
+      submit: { modelRef, handleSubmit, resetFields },
+    } = useSubmitLogic(
+      (model) => {
+        const converter = {
+          <% formModelFields.forEach(function(item){ %>
+            <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeString' : 'toNumber' %>,<% if(item.title) { %> // <%- item.title %><% } %>
+          <% }); %>
+        }
+        if (props.data) {
+          // 编辑
+          return xxxUpdate({
+            ...pickConvert(model, converter)
+          })
+        } else {
+          // 新增
+          return xxxAdd({
+            ...pickConvert(model, converter)
+          })
+        }
+      },
+      {
+        onSuccess() {
+          perferMessage.success('操作成功')
+          props.onUpdate?.()
+          props['onUpdate:show']?.(false)
+        },
+        model: () => ({} as PartialNull<ModalFormModel>),
+        validate: () => formInstRef.value?.validate(),
+        manual: true,
+      }
+    )
+
+    useModalLogic({
+      props,
+      onShow: () => {
+        if (props.data) {
+          modelRef.value = pickConvert(props.data, {
+            <% formModelFields.forEach(function(item){ %>
+              <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeStamp' : 'toString' %>,<% if(item.title) { %> // <%- item.title %><% } %>
+            <% }); %>
+          }, null)
+        } else {
+          resetFields()
+        }
+      },
+      restoreValidation: () => formInstRef.value?.restoreValidation()
+    })
+
+    <% if(formFields.some(d => d.type === "number")) { %>
+      const allowNumber = allowInputNumber()
+    <% } %>
+    return () => (
+      <NModal
+        preset="card"
+        showIcon={false}
+        maskClosable={false}
+        title="title"
+        show={props.show}
+        onUpdate:show={props['onUpdate:show']}
+        style={{ width: '900px' }}
+        size="small"
+        autoFocus={false}
+        {...presetStyleModal}
+        v-slots={{
+          footer: () => (
+            <NSpace size="large" justify="end">
+              <NButton onClick={() => props['onUpdate:show']?.(false)}>取消</NButton>
+              <NButton type="primary" onClick={handleSubmit} loading={loadingRef.value}>
+                确定
+              </NButton>
+            </NSpace>
+          ),
+        }}
+      >
+        <NForm
+          model={modelRef.value}
+          ref={formInstRef}
+          rules={rules}
+          labelPlacement="left"
+          requireMarkPlacement="left"
+          labelWidth={120}
+        >
+          <div class="un-p-12px">
+          <% formFields.forEach(function(item){ %>
+            <NFormItem label="<%- item.title %>:" path="<%- item.key %>">
+              <<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>
+                v-model:value={modelRef.value.<%- item.key %>}
+                <% if(item.type === "number") { %>
+                allowInput={allowNumber}
+                <% } %>
+              ></<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>>
+            </NFormItem>
+          <% }); %>
+          </div>
+        </NForm>
+      </NModal>
+    )
+  },
+})
+<% } %>
+</script>
