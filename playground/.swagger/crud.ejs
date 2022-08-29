@@ -286,6 +286,7 @@ export const XXXModal = defineComponent({
     })
 
     <% if(formFields.some(d => d.type === "number")) { %>
+      // 数字输入限制
       const allowNumber = allowInputNumber()
     <% } %>
     return () => (

@@ -10,25 +10,37 @@ interface ParseResult {
 }
 
 export function parseInterface(input: string) {
-  return (input
-    .match(/.*?interface\s+(\w+)\s+{([\w\W]*)}/)?.[2]
-    .split(/\r?\n/)
-    .map((d) => {
-      const matches = d.match(/(\w+)(\?)?:\s*(\w+)\s*(?:\/\/\s*(\S*)\s*(.+)?)?/)
+  const matches = input.match(/.*?interface\s+(\w+)\s+{([\w\W]*)}/)
 
-      if (!matches) {
-        return null
-      }
+  return {
+    typeName: matches?.[1] || '',
+    fields: (
+      (matches?.[2]
+        .split(/\r?\n/)
+        .map((d) => {
+          const matches = d.match(/(\w+)(\?)?:\s*(\w+)\s*(?:\/\/\s*(\S*)\s*(.+)?)?/)
 
-      return {
-        key: matches[1],
-        required: !matches[2],
-        type: matches[3],
-        title: matches[4]?.trim(),
-        meta: matches[5]?.trim(),
-      }
-    })
-    .filter((d) => d) || []) as ParseResult[]
+          if (!matches) {
+            return null
+          }
+
+          return {
+            key: matches[1],
+            required: !matches[2],
+            type: matches[3],
+            title: matches[4]?.trim(),
+            meta: matches[5]?.trim(),
+          }
+        })
+        .filter((d) => d) || []) as ParseResult[]
+    ).map(({ key, type, required, title, meta }) => ({
+      key,
+      type,
+      required,
+      title: title?.replace(/[a-zA-Z-()]/g, ''),
+      meta,
+    })),
+  }
 }
 
 export default defineConfig({
@@ -74,29 +86,26 @@ export default defineConfig({
       transform(input) {
         return {
           template: `
-          const columns: DataTableColumns<<%- type %>> = [
-            <% props.forEach(function(prop){ %>
+          const columns: DataTableColumns<<%- typeName %>> = [
+            <% fields.forEach(function(prop){ %>
               { key: '<%- prop.key %>', title: '<%- prop.title %>' },
             <% }); %>
           ]`,
-          data: {
-            type: input.match(/.*?interface\s+(\w+)\s+{([\w\W]*)}/)?.[1],
-            props: parseInterface(input),
-          },
+          data: parseInterface(input),
         }
       },
     },
     2: {
       name: '表单字段',
       transform(input) {
-        const parseResult = parseInterface(input)
+        const { fields } = parseInterface(input)
 
         return {
           template: `
           // 校验规则
           const rules: FormRules = {
             <% formRules.forEach(function(item){ %>
-              <%- item.key %>: { required: true, trigger: 'input', message: '请<%- item.type %><%- item.title %>' },
+              <%- item.key %>: { required: true, trigger: 'input', message: '请<%- item.meta?.includes('date-time') ? '选择' : '输入' %><%- item.title %>' },
             <% }); %>
           }
 
@@ -105,24 +114,14 @@ export default defineConfig({
             <>
               <% fields.forEach(function(item){ %>
                 <NFormItem label="<%- item.title %>:" path="<%- item.key %>">
-                  <<%- item.component %> v-model:value={modelRef.value.<%- item.key %>}></<%- item.component %>>
+                  <<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %> v-model:value={modelRef.value.<%- item.key %>}></<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>>
                 </NFormItem>
               <% }); %>
             </>
           )`,
           data: {
-            rules: parseResult
-              .filter(({ required }) => required)
-              .map(({ key, title, meta }) => ({
-                key,
-                title: title?.replace(/[a-zA-Z]/g, ''),
-                type: meta?.includes('date-time') ? '选择' : '输入',
-              })),
-            fields: parseResult.map(({ key, title, meta }) => ({
-              key,
-              title: title?.replace(/[a-zA-Z]/g, ''),
-              component: meta?.includes('date-time') ? 'NDatePicker' : 'NInput',
-            })),
+            rules: fields.filter(({ required }) => required),
+            fields: fields,
           },
         }
       },
@@ -134,16 +133,13 @@ export default defineConfig({
           template: `
           modelRef.value = pickConvert(props.data, {
             <% fields.forEach(function(item){ %>
-              <%- item.key %>: pickConvert.preset.<%- item.method %>,
+              <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeStamp' : 'toString' %>,
             <% }); %>
           }, null)`,
           data: {
-            fields: parseInterface(input)
-              .filter((d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || ''))
-              .map(({ key, meta }) => ({
-                key,
-                method: meta?.includes('date-time') ? 'toTimeStamp' : 'toString',
-              })),
+            fields: parseInterface(input).fields.filter(
+              (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
+            ),
           },
         }
       },
@@ -155,16 +151,13 @@ export default defineConfig({
           template: `
           const converter = {
             <% fields.forEach(function(item){ %>
-              <%- item.key %>: pickConvert.preset.<%- item.method %>,
+              <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeString' : 'toNumber' %>,
             <% }); %>
           }`,
           data: {
-            fields: parseInterface(input)
-              .filter((d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || ''))
-              .map(({ key, meta }) => ({
-                key,
-                method: meta?.includes('date-time') ? 'toTimeString' : 'toNumber',
-              })),
+            fields: parseInterface(input).fields.filter(
+              (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
+            ),
           },
         }
       },
@@ -183,34 +176,26 @@ export default defineConfig({
         const queryType = input.match(/query\?:\s(.+?)\s/)?.[1]
 
         const queryFields = queryType
-          ? parseInterface(input.match(new RegExp(`interface\\s${queryType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '')
+          ? parseInterface(input.match(new RegExp(`interface\\s${queryType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '').fields
           : []
 
         const rowType = isPageSearch
           ? input.match(/records\?:\s(.+?)\[\]/)?.[1]
           : input.match(/content\?:\s(.+?)\[\]/)?.[1]
 
-        const columns = (
-          rowType ? parseInterface(input.match(new RegExp(`interface\\s${rowType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '') : []
-        ).map(({ key, title, meta, type }) => ({
-          key,
-          title: title?.replace(/[a-zA-Z-()]/g, ''),
-          meta,
-          type,
-        }))
+        const columns = rowType
+          ? parseInterface(input.match(new RegExp(`interface\\s${rowType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '').fields
+          : []
 
         return {
           template:
-            fs.readFileSync(`${process.cwd()}/crud.ejs`, 'utf8').match(/<script>([\w\W]*)<\/script>/)?.[1] || '',
+            fs.readFileSync(`${process.cwd()}/.swagger/crud.ejs`, 'utf8').match(/<script>([\w\W]*)<\/script>/)?.[1] ||
+            '',
           data: {
             name,
             queryType,
-            queryFields: queryFields.map(({ key, title, meta, type }) => ({
-              key,
-              title: title?.replace(/[a-zA-Z-()]/g, ''),
-              meta,
-              type,
-            })),
+            queryFields,
+            isPageSearch,
             rowType: rowType || 'RowData',
             columns: columns,
             formModelFields: columns.filter(
@@ -218,7 +203,32 @@ export default defineConfig({
             ),
             formFields: columns.filter((d) => d.key !== 'id'),
             options,
-            isPageSearch,
+          },
+        }
+      },
+    },
+    6: {
+      name: '弹窗表单',
+      transform(input, options) {
+        const name = input.match(/function (.*?)\(/)?.[1] || 'name'
+
+        const { typeName, fields } = parseInterface(input.split(/export default .*?\n+/)[1] || '')
+
+        return {
+          template:
+            fs
+              .readFileSync(`${process.cwd()}/.swagger/modalForm.ejs`, 'utf8')
+              .match(/<script>([\w\W]*)<\/script>/)?.[1] || '',
+          data: {
+            name,
+            rowType: typeName || 'RowData',
+            columns: fields,
+            formModelFields: fields.filter(
+              (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
+            ),
+            formFields: fields.filter((d) => d.key !== 'id'),
+            formRuleFields: fields.filter((d) => d.key !== 'id' && d.required),
+            options,
           },
         }
       },
