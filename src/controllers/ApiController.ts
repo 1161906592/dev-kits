@@ -11,47 +11,33 @@ import { createMockParser } from '../utils/mockPaser'
 import { formatCode, loadSwaggerJSON, saveSwaggerJSON } from '../utils/utils'
 
 class ApiController {
-  async getParseResult(ctx: ParameterizedContext) {
+  async swagger(ctx: ParameterizedContext) {
     const url = ctx.query.url as string
-    const refresh = ctx.query.refresh as string
+    const res = await axios.get<Swagger>(url)
+    const data = res?.data
 
-    if (refresh === '1') {
-      const res = await axios.get<Swagger>(url)
-      const data = res?.data
+    if (data) {
+      const codeParser = createCodeParser(data, config)
+      const mockParser = createMockParser(data)
+      const paths = data.paths
 
-      if (data) {
-        const codeParser = createCodeParser(data, await config)
-        const mockParser = createMockParser(data)
-        const paths = data.paths
-
-        Object.keys(paths).forEach((path) => {
-          Object.keys(paths[path]).forEach((method) => {
-            const { tsCode, jsCode } = codeParser(path, method)
-            paths[path][method].tsCode = tsCode
-            paths[path][method].jsCode = jsCode
-
-            paths[path][method].mockTemplate = JSON.stringify(mockParser(path, method), null, 2)
-
-            paths[path][method].mockJSON = JSON.stringify(mock(mockParser(path, method)), null, 2)
-          })
+      Object.keys(paths).forEach((path) => {
+        Object.keys(paths[path]).forEach((method) => {
+          const { tsCode, jsCode } = codeParser(path, method)
+          paths[path][method].tsCode = tsCode
+          paths[path][method].jsCode = jsCode
+          paths[path][method].mockTemplate = JSON.stringify(mockParser(path, method), null, 2)
+          paths[path][method].mockJSON = JSON.stringify(mock(mockParser(path, method)), null, 2)
         })
+      })
 
-        const swaggerJSON = JSON.stringify(data, null, 2)
-        await saveSwaggerJSON(swaggerJSON)
-        ctx.body = swaggerJSON
-      }
-
-      return
-    }
-
-    try {
-      ctx.body = await loadSwaggerJSON()
-    } catch {
-      ctx.body = '请先加载接口文档'
+      const swaggerJSON = JSON.stringify(data, null, 2)
+      await saveSwaggerJSON(swaggerJSON)
+      ctx.body = swaggerJSON
     }
   }
 
-  async updateMockConfig(ctx: ParameterizedContext) {
+  async updateMock(ctx: ParameterizedContext) {
     const {
       request: { body },
     } = ctx
@@ -79,18 +65,18 @@ class ApiController {
     } = ctx
 
     try {
-      const [swaggerJSON, realConfig] = await Promise.all([loadSwaggerJSON(), config])
+      const swaggerJSON = await loadSwaggerJSON()
 
       const result = await Promise.all(
         (body as { path: string; method: string }[]).map(async (item) => {
           const curPath = swaggerJSON.paths[item.path as string]
           const tsCode = curPath[item.method as string].tsCode
 
-          const realPath = realConfig?.patchPath
-            ? realConfig.patchPath(item.path, swaggerJSON)
+          const realPath = config?.patchPath
+            ? config.patchPath(item.path, swaggerJSON)
             : `${swaggerJSON.basePath}/${item.path}`
 
-          const filePath = `${process.cwd()}/src${`${realConfig?.filePath ? realConfig?.filePath(realPath) : realPath}${
+          const filePath = `${process.cwd()}/src${`${config?.filePath ? config?.filePath(realPath) : realPath}${
             Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''
           }.ts`}`
 
@@ -153,19 +139,22 @@ class ApiController {
     }
   }
 
-  async getCodegen(ctx: ParameterizedContext) {
-    const codegen = (await config)?.codegen || {}
+  async config(ctx: ParameterizedContext) {
+    const { codegen = {}, address = [] } = config || {}
 
-    ctx.body = Object.keys(codegen).map((key) => ({
-      key,
-      name: codegen[key].name,
-      options: codegen[key].options || [],
-    }))
+    ctx.body = {
+      codegen: Object.keys(codegen).map((key) => ({
+        key,
+        name: codegen[key].name,
+        options: codegen[key].options || [],
+      })),
+      address: address,
+    }
   }
 
-  async transformResult(ctx: ParameterizedContext) {
+  async codegen(ctx: ParameterizedContext) {
     const { template, data } =
-      (await config)?.codegen?.[ctx.request.body.key]?.transform(ctx.request.body.input, ctx.request.body.options) || {}
+      config?.codegen?.[ctx.request.body.key]?.transform(ctx.request.body.input, ctx.request.body.options) || {}
 
     ctx.body = template ? formatCode(render(template, data)) : ''
   }

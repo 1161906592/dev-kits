@@ -44,16 +44,50 @@ export function parseInterface(input: string) {
 }
 
 export default defineConfig({
-  // patchPath: (path, data) => {
-  //   const port = data.host.split(':')[1]
+  patchPath: (path, data) => {
+    const port = data.host.split(':')[1]
 
-  //   const basePathMap = {
-  //     9001: '/',
-  //     9004: '/xg-mes-production',
-  //   }
+    const basePathMap = {
+      9001: '/',
+      9002: '/xg-mes-material',
+      9003: '/xg-mes-plan',
+      9004: '/xg-mes-production',
+    }
 
-  //   return `/api${basePathMap[port]}/${path}`
-  // },
+    return `/api${basePathMap[port]}${data.basePath}/${path}`
+  },
+  proxy: {
+    rewrite(path, address) {
+      const { port } = new URL(address)
+
+      const portRewriteMap = {
+        9001: () => path.replace('/api', ''),
+        9002: () => path.replace('/api/xg-mes-material', ''),
+        9003: () => path.replace('/api/xg-mes-plan', ''),
+        9004: () => path.replace('/api/xg-mes-production', ''),
+      }
+
+      return portRewriteMap[port]()
+    },
+  },
+  address: [
+    {
+      label: '服务器',
+      value: 'server',
+      children: [
+        { label: '生产', value: 'http://192.168.50.161:9001/xg-mes-production' },
+        { label: '计划', value: 'http://192.168.50.161:9001/xg-mes-plan' },
+      ],
+    },
+    {
+      label: '本地',
+      value: 'local',
+      children: [
+        { label: '生产', value: 'http://192.168.50.161:9004' },
+        { label: '计划', value: 'http://192.168.50.161:9003' },
+      ],
+    },
+  ],
   apiTemplate: `
   import { request } from "@celi/shared"
   

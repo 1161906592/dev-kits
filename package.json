@@ -37,6 +37,7 @@
     "@celi/eslint-config": "^0.1.0",
     "@types/ejs": "^3.1.1",
     "@types/fs-extra": "^9.0.13",
+    "@types/http-proxy": "^1.17.9",
     "@types/koa": "^2.13.5",
     "@types/koa-router": "^7.4.4",
     "@types/koa2-cors": "^2.0.2",
@@ -51,14 +52,16 @@
     "axios": "^0.27.2",
     "chokidar": "^3.5.3",
     "ejs": "^3.1.8",
-    "esbuild": "^0.15.5",
     "execa": "^4.0.2",
     "fs-extra": "^10.1.0",
+    "http-proxy": "^1.18.1",
+    "jiti": "^1.14.0",
     "koa": "^2.13.4",
     "koa-body": "^5.0.0",
     "koa-router": "^12.0.0",
     "koa2-cors": "^2.0.6",
     "mockjs": "^1.1.0",
+    "picocolors": "^1.0.0",
     "prettier": "^2.7.1"
   }
 }

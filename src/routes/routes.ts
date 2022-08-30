@@ -1,16 +1,16 @@
 import KoaRouter from 'koa-router'
 import api from '../controllers/ApiController'
 
-const router = new KoaRouter({ prefix: '/swagger' })
+const router = new KoaRouter({ prefix: '/__swagger__' })
 
-router.get('/parseResult', api.getParseResult)
+router.get('/swagger', api.swagger)
 
-router.post('/mockConfig', api.updateMockConfig)
+router.get('/config', api.config)
+
+router.post('/updateMock', api.updateMock)
 
 router.post('/syncCode', api.syncCode)
 
-router.get('/codegen', api.getCodegen)
-
-router.post('/transformResult', api.transformResult)
+router.post('/codegen', api.codegen)
 
 export default router
