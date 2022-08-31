@@ -2,12 +2,14 @@ import Server, { ServerOptions } from 'http-proxy'
 import { Swagger } from './types'
 
 export interface Codegen {
-  name: string
+  label: string
+  key: string
+  children?: Codegen[]
   options?: {
     label: string
     value: string
   }[]
-  transform(
+  transform?(
     input: string,
     options: string[]
   ): {
@@ -30,7 +32,7 @@ export interface ProxyOptions extends ServerOptions {
 
 export interface IConfig {
   apiTemplate: string
-  codegen?: Record<string, Codegen>
+  codegen?: Codegen[]
   patchPath?(path: string, data: Swagger): string
   filePath?(path: string): string
   address?: Address[]

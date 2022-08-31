@@ -1,18 +1,12 @@
-<script>
 import { FormInst } from "naive-ui"
 
 export const XXXModal = defineComponent({
   props: {
-    ...createModalProps<<%- rowType %>>(),
+    ...createModalProps<<%- inputType %>>(),
   },
   setup(props) {
     const formInstRef = ref<FormInst | null>(null)
-    // 表单校验规则
-    const rules: FormRules = {
-      <% formRuleFields.forEach(function(item){ %>
-        <%- item.key %>: { required: true, trigger: 'input', message: '请<%- item.meta?.includes('date-time') ? '选择' : '输入' %><%- item.title %>' },
-      <% }); %>
-    }
+    <%- include( `${process.cwd()}/.swagger/formRules.ejs`, { fields: outputFields }) %>
 
     // 提交表单
     const {
@@ -20,11 +14,8 @@ export const XXXModal = defineComponent({
       submit: { modelRef, handleSubmit, resetFields },
     } = useSubmitLogic(
       async (model) => {
-        const converter = {
-          <% formModelFields.forEach(function(item){ %>
-            <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeString' : 'toNumber' %>,<% if(item.title) { %> // <%- item.title %><% } %>
-          <% }); %>
-        }
+        <%- include( `${process.cwd()}/.swagger/converter.ejs`, { fields: outputFields }) %>
+
         const res = await <%- name %>({
           ...pickConvert(model, converter)
         })
@@ -47,11 +38,8 @@ export const XXXModal = defineComponent({
       props,
       onShow: () => {
         if (props.data) {
-          modelRef.value = pickConvert(props.data, {
-            <% formModelFields.forEach(function(item){ %>
-              <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeStamp' : 'toString' %>,<% if(item.title) { %> // <%- item.title %><% } %>
-            <% }); %>
-          }, null)
+          <%- include( `${process.cwd()}/.swagger/converter.ejs`, { fields: inputFields, isForm: true }) %>
+          modelRef.value = pickConvert(props.data, converter, null)
         } else {
           resetFields()
         }
@@ -59,10 +47,7 @@ export const XXXModal = defineComponent({
       restoreValidation: () => formInstRef.value?.restoreValidation()
     })
 
-    <% if(formFields.some(d => d.type === "number")) { %>
-      // 数字输入限制
-      const allowNumber = allowInputNumber()
-    <% } %>
+    <%- include( `${process.cwd()}/.swagger/formFields.ejs`, { fields: outputFields }) %>
     return () => (
       <NModal
         preset="card"
@@ -95,16 +80,7 @@ export const XXXModal = defineComponent({
           labelWidth={120}
         >
           <div class="un-p-12px">
-          <% formFields.forEach(function(item){ %>
-            <NFormItem label="<%- item.title %>:" path="<%- item.key %>">
-              <<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>
-                v-model:value={modelRef.value.<%- item.key %>}
-                <% if(item.type === "number") { %>
-                allowInput={allowNumber}
-                <% } %>
-              ></<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>>
-            </NFormItem>
-          <% }); %>
+            {renderFields()}
           </div>
         </NForm>
       </NModal>
@@ -121,9 +97,4 @@ export const XXXModal = defineComponent({
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  */
- export interface ModalFormModel extends Omit<<%- rowType %>, <%- formModelFields.map(d => `"${d.key}"`).join("|") %> > {
-  <% formModelFields.forEach(function(item){ %>
-    <%- item.key %>: <%- item.meta?.includes('date-time') ? 'number' : 'string' %><% if(item.title) { %> // <%- item.title %><% } %>
-  <% }); %>
-}
-</script>
+<%- include( `${process.cwd()}/.swagger/formModel.ejs`, { typeName: outputType, fields: outputFields }) %>

@@ -1,0 +1,5 @@
+const columns: DataTableColumns<<%- typeName %>> = [
+  <% fields.forEach(function(prop){ %>
+    { key: '<%- prop.key %>', title: '<%- prop.title %>' },
+  <% }); %>
+]

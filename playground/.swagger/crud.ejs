@@ -1,4 +1,3 @@
-<script>
 import { DataTableColumns } from "naive-ui"
 
 export const XXX = defineComponent({
@@ -30,10 +29,8 @@ export const XXX = defineComponent({
         return res.content
       }, {
       model: () => ({
-        <% queryFields.forEach(function(item){ %>
-          <%- item.key %>: null, // <%- item.title %>
-        <% }) %>
-      }),
+        <%- include( `${process.cwd()}/.swagger/queryModelData.ejs`, { fields: queryFields }) %>
+      } as PartialNull<XXX>),
       defaultPageSize: 10
     })
     <% } else { %>
@@ -51,9 +48,7 @@ export const XXX = defineComponent({
       {
         <% if (queryType) { %>
         model: () => ({
-          <% queryFields.forEach(function(item){ %>
-            <%- item.key %>: null, // <%- item.title %>
-          <% }) %>
+          <%- include( `${process.cwd()}/.swagger/queryModelData.ejs`, { fields: queryFields }) %>
         } as PartialNull<<%- queryType %>>),
         <% } else { %>
         model: () => null,
@@ -84,7 +79,7 @@ export const XXX = defineComponent({
     // 表格列
     const columns: DataTableColumns<<%- rowType %>> = [
       <% columns.forEach(function(item){ %>
-        { key: '<%- item.key %>', title: '<%- item.title %>' },
+        { key: '<%- item.key %>', title: '<%- item.title %>',  },
       <% }) %>
       <% if (options.includes("update") || options.includes("delete")) { %>
         {
@@ -126,40 +121,41 @@ export const XXX = defineComponent({
 
     const rowKey = (row: <%- rowType %>) => row.xxx
 
+    
+    <%- include( `${process.cwd()}/.swagger/queryFormFields.ejs`, { fields: queryFields }) %>
+
     return (
       <>
         <% if (queryFields.length || options.includes("add")) { %>
-          <NForm labelPlacement="left">
+          <NForm labelPlacement="left" showFeedback={false}>
             <CSearchLayout
               <% if (queryFields.length) { %>
-              onSearch={handleSubmit}
-              onReset={handleReset}
+                onSearch={handleSubmit}
+                onReset={handleReset}
               <% } %> 
-              v-slots={{
-                handles: () => (
-                  <>
-                    <NButton
-                      type="primary"
-                      v-slots={{
-                        icon: () => (
-                          <NIcon>
-                            <Add />
-                          </NIcon>
-                        ),
-                      }}
-                      onClick={handleAdd}
-                    >
-                      新增
-                    </NButton>
-                  </>
-                )
-              }}
+              <% if (options.includes("add")) { %>
+                v-slots={{
+                  handles: () => (
+                    <>
+                      <NButton
+                        type="primary"
+                        v-slots={{
+                          icon: () => (
+                            <NIcon>
+                              <Add />
+                            </NIcon>
+                          ),
+                        }}
+                        onClick={handleAdd}
+                      >
+                        新增
+                      </NButton>
+                    </>
+                  )
+                }}
+              <% } %> 
             >
-              <% queryFields.forEach(function(item){ %>
-                <NFormItem label="<%- item.title %>:">
-                  <<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %> v-model:value={modelRef.value.<%- item.key %>}></<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>>
-                </NFormItem>
-              <% }) %>
+              {renderFields()}
             </CSearchLayout>
           </NForm>
         <% } %>
@@ -188,7 +184,7 @@ export const XXX = defineComponent({
         </div>
         <% } %>
         <% if (options.includes("add") || options.includes("update")) { %>
-        <XXXModal v-model:show={showRef.value} data={modalDataRef.value} onUpdate={handleSubmit} />
+        <XXXModal v-model:show={showRef.value} title={titleRef.value} data={modalDataRef.value} onUpdate={handleSubmit} />
         <% } %> 
       </>
     )
@@ -205,12 +201,7 @@ export const XXX = defineComponent({
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  */
-export interface ModalFormModel extends Omit<<%- rowType %>, <%- formModelFields.map(d => `"${d.key}"`).join("|") %> > {
-  <% formModelFields.forEach(function(item){ %>
-    <%- item.key %>: <%- item.meta?.includes('date-time') ? 'number' : 'string' %><% if(item.title) { %> // <%- item.title %><% } %>
-  <% }); %>
-}
-
+<%- include( `${process.cwd()}/.swagger/formModel.ejs`, { typeName: rowType, fields: outputFields }) %>
 /**
  * 弹窗组件代码
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -227,24 +218,17 @@ export const XXXModal = defineComponent({
   },
   setup(props) {
     const formInstRef = ref<FormInst | null>(null)
-    // 表单校验规则
-    const rules: FormRules = {
-      <% formFields.forEach(function(item){ %>
-        <%- item.key %>: { required: true, trigger: 'input', message: '请<%- item.meta?.includes('date-time') ? '选择' : '输入' %><%- item.title %>' },
-      <% }); %>
-    }
 
+    <%- include( `${process.cwd()}/.swagger/formRules.ejs`, { fields: outputFields }) %>
+    
     // 提交表单
     const {
       loadingRef,
       submit: { modelRef, handleSubmit, resetFields },
     } = useSubmitLogic(
       (model) => {
-        const converter = {
-          <% formModelFields.forEach(function(item){ %>
-            <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeString' : 'toNumber' %>,<% if(item.title) { %> // <%- item.title %><% } %>
-          <% }); %>
-        }
+        <%- include( `${process.cwd()}/.swagger/converter.ejs`, { fields: columns }) %>
+        
         if (props.data) {
           // 编辑
           return xxxUpdate({
@@ -273,11 +257,8 @@ export const XXXModal = defineComponent({
       props,
       onShow: () => {
         if (props.data) {
-          modelRef.value = pickConvert(props.data, {
-            <% formModelFields.forEach(function(item){ %>
-              <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeStamp' : 'toString' %>,<% if(item.title) { %> // <%- item.title %><% } %>
-            <% }); %>
-          }, null)
+          <%- include( `${process.cwd()}/.swagger/converter.ejs`, { fields: columns, isForm: true }) %>
+          modelRef.value = pickConvert(props.data, converter, null)
         } else {
           resetFields()
         }
@@ -285,10 +266,7 @@ export const XXXModal = defineComponent({
       restoreValidation: () => formInstRef.value?.restoreValidation()
     })
 
-    <% if(formFields.some(d => d.type === "number")) { %>
-      // 数字输入限制
-      const allowNumber = allowInputNumber()
-    <% } %>
+    <%- include( `${process.cwd()}/.swagger/formFields.ejs`, { fields: outputFields }) %>
     return () => (
       <NModal
         preset="card"
@@ -321,16 +299,7 @@ export const XXXModal = defineComponent({
           labelWidth={120}
         >
           <div class="un-p-12px">
-          <% formFields.forEach(function(item){ %>
-            <NFormItem label="<%- item.title %>:" path="<%- item.key %>">
-              <<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>
-                v-model:value={modelRef.value.<%- item.key %>}
-                <% if(item.type === "number") { %>
-                allowInput={allowNumber}
-                <% } %>
-              ></<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>>
-            </NFormItem>
-          <% }); %>
+            {renderFields()}
           </div>
         </NForm>
       </NModal>
@@ -338,4 +307,3 @@ export const XXXModal = defineComponent({
   },
 })
 <% } %>
-</script>

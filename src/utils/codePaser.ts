@@ -1,4 +1,5 @@
 import { render } from 'ejs'
+import colors from 'picocolors'
 import { IConfig } from '..'
 import {
   Definition,
@@ -31,7 +32,7 @@ function javaTypeToTsKeyword(javaType: JavaType, item?: DefinitionArrayItem): st
 
 function resolveInterface(
   ref: string,
-  definitions: Record<string, Definition>,
+  definitions: Record<string, Definition | undefined>,
   collector: InterfaceItem[],
   markRequired: boolean
 ) {
@@ -42,11 +43,19 @@ function resolveInterface(
   const interfaceBody: PropItem[] = []
 
   Object.keys(properties).forEach((propName) => {
-    const { type, $ref, description, format, items } = properties[propName]
+    const property = properties[propName]
+
+    if (!property) {
+      console.log(`\nthe ${colors.red(colors.bold(propName))} attribute is not found`)
+
+      return
+    }
+
+    const { type, $ref, description, format, items } = property
     const tsKeyword = $ref ? $ref : type ? javaTypeToTsKeyword(type, items) : null
 
     if (!tsKeyword) {
-      console.log(`the ${propName} attribute of the ${$ref} is ignored`)
+      console.log(`\nthe ${colors.red(colors.bold(propName))} attribute of the ${$ref} is ignored`)
 
       return
     }
@@ -83,7 +92,7 @@ function resolveQueryOrPath(
   parameters: Parameter[],
   name: string,
   resolveType: 'query' | 'path',
-  definitions: Record<string, Definition>
+  definitions: Record<string, Definition | undefined>
 ) {
   const collector: InterfaceItem[] = []
   const interfaceBody: PropItem[] = []
@@ -107,7 +116,7 @@ function resolveQueryOrPath(
       : null
 
     if (!tsKeyword) {
-      console.log(`the ${name} attribute of the ${interfaceName} is ignored`)
+      console.log(`\nthe ${colors.red(colors.bold(name))} attribute of the ${interfaceName} is ignored`)
 
       return
     }
@@ -130,7 +139,10 @@ function resolveQueryOrPath(
   return collector
 }
 
-function resolveResponseBodyInterface(definition: RequestDefinition, definitions: Record<string, Definition>) {
+function resolveResponseBodyInterface(
+  definition: RequestDefinition,
+  definitions: Record<string, Definition | undefined>
+) {
   const $ref = definition.responses[200].schema?.$ref
   const collector: InterfaceItem[] = []
   $ref && resolveInterface($ref, definitions, collector, false)
@@ -138,7 +150,10 @@ function resolveResponseBodyInterface(definition: RequestDefinition, definitions
   return collector
 }
 
-function resolveRequestBodyInterface(definition: RequestDefinition, definitions: Record<string, Definition>) {
+function resolveRequestBodyInterface(
+  definition: RequestDefinition,
+  definitions: Record<string, Definition | undefined>
+) {
   const collector: InterfaceItem[] = []
 
   const item = definition.parameters?.find((d) => d.in === 'body' && (d.schema?.$ref || d.schema?.type === 'array'))
@@ -176,7 +191,11 @@ function transformOperationId(operationId: string) {
   return index === -1 ? operationId : operationId.slice(0, index)
 }
 
-function resolveQuery(pathVars: string[], definition: RequestDefinition, definitions: Record<string, Definition>) {
+function resolveQuery(
+  pathVars: string[],
+  definition: RequestDefinition,
+  definitions: Record<string, Definition | undefined>
+) {
   return resolveQueryOrPath(
     pathVars,
     definition.parameters || [],
@@ -186,7 +205,11 @@ function resolveQuery(pathVars: string[], definition: RequestDefinition, definit
   )
 }
 
-function resolvePath(pathVars: string[], definition: RequestDefinition, definitions: Record<string, Definition>) {
+function resolvePath(
+  pathVars: string[],
+  definition: RequestDefinition,
+  definitions: Record<string, Definition | undefined>
+) {
   return resolveQueryOrPath(
     pathVars,
     definition.parameters || [],
@@ -196,8 +219,14 @@ function resolvePath(pathVars: string[], definition: RequestDefinition, definiti
   )
 }
 
-function resolveProgram(paths: Paths, path: string, method: string, definitions: Record<string, Definition>) {
-  const definition = paths[path][method]
+function resolveProgram(
+  paths: Paths,
+  path: string,
+  method: string,
+  definitions: Record<string, Definition | undefined>
+) {
+  const definition = paths[path]?.[method]
+  if (!definition) return
   const name = transformOperationId(definition.operationId)
   const pathVars = path.match(/\{(.+?)\}/g)?.map((d) => d.slice(1, -1)) || []
 
@@ -237,6 +266,9 @@ export function createCodeParser(swaggerJSON: Swagger, config?: IConfig) {
   const { patchPath, apiTemplate = '' } = config || {}
 
   return (path: string, method: string) => {
+    const program = resolveProgram(swaggerJSON.paths, path, method, swaggerJSON.definitions)
+    if (!program) return
+
     const {
       name,
       comment,
@@ -248,7 +280,7 @@ export function createCodeParser(swaggerJSON: Swagger, config?: IConfig) {
       requestBody,
       responseBodyInterfaces,
       responseBody,
-    } = resolveProgram(swaggerJSON.paths, path, method, swaggerJSON.definitions)
+    } = program
 
     const fullPath = (patchPath ? patchPath(path, swaggerJSON) : `${swaggerJSON.basePath}/${path}`).replace(/\/+/g, '/')
 

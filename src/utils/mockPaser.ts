@@ -20,16 +20,22 @@ function toMockTemplateKeyword(javaType: JavaType): unknown {
   }
 }
 
-function resolveMockTemplate(ref = '', definitions: Record<string, Definition>, collectors: Record<string, boolean>) {
+function resolveMockTemplate(
+  ref = '',
+  definitions: Record<string, Definition | undefined>,
+  collectors: Record<string, boolean>
+) {
   if (!ref || collectors[ref]) return
   collectors[ref] = true
-  const properties = definitions[ref.substring('#/definitions/'.length)].properties
+  const properties = definitions[ref.substring('#/definitions/'.length)]?.properties
   if (!properties) return
 
   const result: MockTemplate = {}
 
   Object.keys(properties).forEach((propName) => {
-    const { type, $ref, items, enum: enums } = properties[propName]
+    const property = properties[propName]
+    if (!property) return
+    const { type, $ref, items, enum: enums } = property
 
     result[propName] = enums
       ? enums[~~(Math.random() * enums.length)]
@@ -47,6 +53,10 @@ function resolveMockTemplate(ref = '', definitions: Record<string, Definition>, 
 
 export function createMockParser(swaggerJSON: Swagger) {
   return (path: string, method: string) => {
-    return resolveMockTemplate(swaggerJSON.paths[path][method].responses[200].schema?.$ref, swaggerJSON.definitions, {})
+    return resolveMockTemplate(
+      swaggerJSON.paths[path]?.[method]?.responses[200].schema?.$ref,
+      swaggerJSON.definitions,
+      {}
+    )
   }
 }

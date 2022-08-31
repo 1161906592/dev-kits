@@ -1,0 +1,16 @@
+export interface <%- typeof exportName === 'undefined' ? 'ModalFormModel' : exportName %> extends Omit<<%- typeName || 'TypeName' %>, <%- fields
+.filter((d) => d.type !== 'boolean' && (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || ''))
+.filter((d) => !/\d+-\S+/.test(d.meta) && !d.meta?.includes('remote'))
+.map(d => `"${d.key}"`).join("|") || "''" %>> {
+  <% fields
+  .filter((d) => d.type !== 'boolean' && (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || ''))
+  .filter((d) => !/\d+-\S+/.test(d.meta) && !d.meta?.includes('remote'))
+  .forEach(function(item){ %>
+    <%- item.key %>: <%- item.meta?.includes('date-time') ? 'number' : 'string' %><% if(item.title) { %> // <%- item.title %><% } %>
+  <% }) %>
+  <% if (typeof appendFields !== 'undefined') { %>
+    <% appendFields.forEach(function(item){ %>
+      <%- item.key %>: <%- item.type %><% if(item.title) { %> // <%- item.title %><% } %>
+    <% }) %>
+  <% } %>
+}

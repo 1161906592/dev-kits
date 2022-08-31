@@ -8,7 +8,7 @@ import { Swagger } from '../types'
 import { createCodeParser } from '../utils/codePaser'
 import { config } from '../utils/config'
 import { createMockParser } from '../utils/mockPaser'
-import { formatCode, loadMockCode, resetMockCode, saveMockCode } from '../utils/utils'
+import { findCodegen, formatCode, loadMockCode, resetMockCode, saveMockCode } from '../utils/utils'
 
 export class ApiController {
   static swaggerJSON: Promise<Swagger | null> = Promise.resolve(null)
@@ -117,7 +117,7 @@ export class ApiController {
       const swagger = await ApiController.swaggerJSON
       if (!swagger) throw ''
 
-      const cur = swagger.paths[body.path][body.method]
+      const cur = swagger.paths?.[body.path]?.[body.method]
 
       if (!cur) {
         throw ''
@@ -163,7 +163,9 @@ export class ApiController {
       const result = await Promise.all(
         (body as { path: string; method: string }[]).map(async (item) => {
           const curPath = swagger.paths[item.path as string]
-          const tsCode = codeParser(item.path, item.method).tsCode
+          if (!curPath) return
+          const { tsCode } = codeParser(item.path, item.method) || {}
+          if (!tsCode) return
 
           const realPath = config?.patchPath ? config.patchPath(item.path, swagger) : `${swagger.basePath}/${item.path}`
 
@@ -203,9 +205,9 @@ export class ApiController {
         // 同步项目的eslint格式
         await Promise.all(
           result
-            .filter((d) => d.status === 'ok')
+            .filter((d) => d?.status === 'ok')
             .map((item) => {
-              return execa('eslint', ['--fix', item.filePath], {
+              return execa('eslint', ['--fix', item?.filePath || ''], {
                 stdio: 'inherit',
                 cwd: process.cwd(),
               })
@@ -215,12 +217,12 @@ export class ApiController {
         //
       }
 
-      const disabledResult = result.filter((d) => d.status === 'disabled')
+      const disabledResult = result.filter((d) => d?.status === 'disabled')
 
       ctx.body = {
         status: true,
         message: disabledResult.length
-          ? `${disabledResult.map((d) => `${d.method.toUpperCase()}: ${d.path}`).join('、')}禁止被覆盖已跳过`
+          ? `${disabledResult.map((d) => `${d?.method.toUpperCase()}: ${d?.path}`).join('、')}禁止被覆盖已跳过`
           : '同步成功',
       }
     } catch (e) {
@@ -234,25 +236,23 @@ export class ApiController {
   }
 
   async config(ctx: ParameterizedContext) {
-    const { codegen = {}, address = [] } = config || {}
+    const { codegen = [], address = [] } = config || {}
 
     ctx.body = {
       status: true,
       data: {
-        codegen: Object.keys(codegen).map((key) => ({
-          key,
-          name: codegen[key].name,
-          options: codegen[key].options || [],
-        })),
-        address: address,
+        codegen,
+        address,
       },
     }
   }
 
   async codegen(ctx: ParameterizedContext) {
     try {
-      const { template, data } =
-        config?.codegen?.[ctx.request.body.key]?.transform(ctx.request.body.input, ctx.request.body.options) || {}
+      const key = ctx.request.body.key
+      const codegen = findCodegen(config?.codegen || [], key)
+
+      const { template, data } = codegen?.transform?.(ctx.request.body.input, ctx.request.body.options) || {}
 
       ctx.body = {
         status: true,

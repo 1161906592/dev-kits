@@ -1,5 +1,6 @@
 import promises from 'fs/promises'
 import { format } from 'prettier'
+import { Codegen } from '..'
 import { dataDir } from '../constants'
 
 // 匹配引用类型的名称
@@ -36,7 +37,6 @@ export async function saveMockCode(path: string, method: string, type: string, c
   await promises.writeFile(`${dataDir}/${filename}.txt`, code, 'utf8')
 }
 
-
 export async function resetMockCode(path: string, method: string, type: string) {
   const filename = `${path}-${method}-${type}`.slice(1).replace(/\//g, '+')
 
@@ -49,9 +49,34 @@ export async function resetMockCode(path: string, method: string, type: string) 
 
 export async function loadMockCode(path: string, method: string, type: string) {
   const filename = `${path}-${method}-${type}`.slice(1).replace(/\//g, '+')
+
   try {
     return await promises.readFile(`${dataDir}/${filename}.txt`, 'utf8')
   } catch {
-    return ""
+    return ''
   }
+}
+
+export function findCodegen(codegen: Codegen[], key: string) {
+  let target: Codegen | undefined = undefined
+
+  const fn = (list: Codegen[]) => {
+    for (let index = 0; index < list.length; index += 1) {
+      const item = list[index]
+
+      if (item.key === key) {
+        target = item
+
+        return true
+      }
+
+      if (fn(item.children || [])) {
+        return true
+      }
+    }
+  }
+
+  fn(codegen)
+
+  return target as Codegen | undefined
 }

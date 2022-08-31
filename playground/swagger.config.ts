@@ -115,158 +115,243 @@ export default defineConfig({
     return res.data<% if(responseBody) { %> as <%- responseBody %> <% } %>
   }
   export default <%- name %>`,
-  codegen: {
-    1: {
-      name: '表格列',
-      transform(input) {
-        return {
-          template: `
-          const columns: DataTableColumns<<%- typeName %>> = [
-            <% fields.forEach(function(prop){ %>
-              { key: '<%- prop.key %>', title: '<%- prop.title %>' },
-            <% }); %>
-          ]`,
-          data: parseInterface(input),
-        }
-      },
-    },
-    2: {
-      name: '表单字段',
-      transform(input) {
-        const { fields } = parseInterface(input)
+  codegen: [
+    {
+      key: 'fragment',
+      label: '代码片段',
+      children: [
+        {
+          key: 'search',
+          label: '数据查询',
+          children: [
+            {
+              key: 'queryModelData',
+              label: '表单 model',
+              transform(input) {
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/queryModelData.ejs`, 'utf8'),
+                  data: {
+                    fields: parseInterface(input).fields,
+                    isSingle: true,
+                  },
+                }
+              },
+            },
+            {
+              key: 'queryFormFields',
+              label: '表单 renderFields',
+              transform(input) {
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/queryFormFields.ejs`, 'utf8'),
+                  data: {
+                    fields: parseInterface(input).fields,
+                  },
+                }
+              },
+            },
+            {
+              key: 'columns',
+              label: '表格 columns',
+              transform(input) {
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/columns.ejs`, 'utf8'),
+                  data: parseInterface(input),
+                }
+              },
+            },
+          ],
+        },
+        {
+          key: 'submit',
+          label: '表单提交',
+          children: [
+            {
+              key: 'formRules',
+              label: '表单 formRules',
+              transform(input) {
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/formRules.ejs`, 'utf8'),
+                  data: {
+                    fields: parseInterface(input).fields.filter(({ required }) => required),
+                  },
+                }
+              },
+            },
+            {
+              key: 'formFields',
+              label: '表单 renderFields',
+              transform(input) {
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/formFields.ejs`, 'utf8'),
+                  data: {
+                    fields: parseInterface(input).fields,
+                  },
+                }
+              },
+            },
+            {
+              key: 'formConverter',
+              label: '转换为表单类型',
+              transform(input) {
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/converter.ejs`, 'utf8'),
+                  data: {
+                    fields: parseInterface(input).fields.filter(
+                      (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
+                    ),
+                  },
+                }
+              },
+            },
+            {
+              key: 'dataConverter',
+              label: '转换为后端类型',
+              transform(input) {
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/converter.ejs`, 'utf8'),
+                  data: {
+                    fields: parseInterface(input).fields.filter(
+                      (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
+                    ),
+                    isForm: true,
+                  },
+                }
+              },
+            },
+            {
+              key: 'formModel',
+              label: '表单TS类型',
+              transform(input) {
+                const { typeName, fields } = parseInterface(input)
 
-        return {
-          template: `
-          // 校验规则
-          const rules: FormRules = {
-            <% formRules.forEach(function(item){ %>
-              <%- item.key %>: { required: true, trigger: 'input', message: '请<%- item.meta?.includes('date-time') ? '选择' : '输入' %><%- item.title %>' },
-            <% }); %>
-          }
-
-          // 表单项
-          const renderFormItems = () => (
-            <>
-              <% fields.forEach(function(item){ %>
-                <NFormItem label="<%- item.title %>:" path="<%- item.key %>">
-                  <<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %> v-model:value={modelRef.value.<%- item.key %>}></<%- item.meta?.includes('date-time') ? 'NDatePicker' : 'NInput' %>>
-                </NFormItem>
-              <% }); %>
-            </>
-          )`,
-          data: {
-            rules: fields.filter(({ required }) => required),
-            fields: fields,
-          },
-        }
-      },
-    },
-    3: {
-      name: '表单转换',
-      transform(input) {
-        return {
-          template: `
-          modelRef.value = pickConvert(props.data, {
-            <% fields.forEach(function(item){ %>
-              <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeStamp' : 'toString' %>,
-            <% }); %>
-          }, null)`,
-          data: {
-            fields: parseInterface(input).fields.filter(
-              (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
-            ),
-          },
-        }
-      },
-    },
-    4: {
-      name: '数据转换',
-      transform(input) {
-        return {
-          template: `
-          const converter = {
-            <% fields.forEach(function(item){ %>
-              <%- item.key %>: pickConvert.preset.<%- item.meta?.includes('date-time') ? 'toTimeString' : 'toNumber' %>,
-            <% }); %>
-          }`,
-          data: {
-            fields: parseInterface(input).fields.filter(
-              (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
-            ),
-          },
-        }
-      },
-    },
-    5: {
-      name: '增删改查',
-      options: [
-        { label: '新增', value: 'add' },
-        { label: '修改', value: 'update' },
-        { label: '删除', value: 'delete' },
+                return {
+                  template: fs.readFileSync(`${process.cwd()}/.swagger/formModel.ejs`, 'utf8'),
+                  data: {
+                    typeName,
+                    fields: fields
+                      .filter(
+                        (d) =>
+                          (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
+                      )
+                      .filter((d) => !/\d+-\S+/.test(d.meta || '') && !d.meta?.includes('remote')),
+                  },
+                }
+              },
+            },
+          ],
+        },
       ],
-      transform(input, options) {
-        const name = input.match(/function (.*?)\(/)?.[1] || 'name'
-        const isPageSearch = input.includes('PageBeanEntity')
-
-        const queryType = input.match(/query\?:\s(.+?)\s/)?.[1]
-
-        const queryFields = queryType
-          ? parseInterface(input.match(new RegExp(`interface\\s${queryType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '').fields
-          : []
-
-        const rowType = isPageSearch
-          ? input.match(/records\?:\s(.+?)\[\]/)?.[1]
-          : input.match(/content\?:\s(.+?)\[\]/)?.[1]
-
-        const columns = rowType
-          ? parseInterface(input.match(new RegExp(`interface\\s${rowType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '').fields
-          : []
-
-        return {
-          template:
-            fs.readFileSync(`${process.cwd()}/.swagger/crud.ejs`, 'utf8').match(/<script>([\w\W]*)<\/script>/)?.[1] ||
-            '',
-          data: {
-            name,
-            queryType,
-            queryFields,
-            isPageSearch,
-            rowType: rowType || 'RowData',
-            columns: columns,
-            formModelFields: columns.filter(
-              (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
-            ),
-            formFields: columns.filter((d) => d.key !== 'id'),
-            options,
-          },
-        }
-      },
     },
-    6: {
-      name: '弹窗表单',
-      transform(input, options) {
-        const name = input.match(/function (.*?)\(/)?.[1] || 'name'
+    {
+      key: 'complex',
+      label: '复合组件',
+      children: [
+        {
+          key: 'crud',
+          label: '增删改查',
+          options: [
+            { label: '新增', value: 'add' },
+            { label: '修改', value: 'update' },
+            { label: '删除', value: 'delete' },
+          ],
+          transform(input, options) {
+            const name = input.match(/function (.*?)\(/)?.[1] || 'name'
+            const isPageSearch = input.includes('PageBeanEntity')
 
-        const { typeName, fields } = parseInterface(input.split(/export default .*?\n+/)[1] || '')
+            const queryType = input.match(/query\?:\s(.+?)\s/)?.[1]
 
-        return {
-          template:
-            fs
-              .readFileSync(`${process.cwd()}/.swagger/modalForm.ejs`, 'utf8')
-              .match(/<script>([\w\W]*)<\/script>/)?.[1] || '',
-          data: {
-            name,
-            rowType: typeName || 'RowData',
-            columns: fields,
-            formModelFields: fields.filter(
-              (d) => (d.type !== 'string' || d.meta?.includes('date-time')) && !/^(id|.+Id)$/.test(d.key || '')
-            ),
-            formFields: fields.filter((d) => d.key !== 'id'),
-            formRuleFields: fields.filter((d) => d.key !== 'id' && d.required),
-            options,
+            const queryFields = queryType
+              ? parseInterface(input.match(new RegExp(`interface\\s${queryType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '').fields
+              : []
+
+            const rowType = isPageSearch
+              ? input.match(/records\?:\s(.+?)\[\]/)?.[1]
+              : input.match(/content\?:\s(.+?)\[\]/)?.[1]
+
+            const columns = rowType
+              ? parseInterface(input.match(new RegExp(`interface\\s${rowType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '').fields
+              : []
+
+            const { typeName: outputType = 'OutputType', fields: outputFields } = parseInterface(
+              input.split(/export default .*?\n+/)[1] || ''
+            )
+
+            return {
+              template: fs.readFileSync(`${process.cwd()}/.swagger/crud.ejs`, 'utf8'),
+              data: {
+                name,
+                queryType,
+                queryFields,
+                isPageSearch,
+                rowType: rowType || 'RowData',
+                columns: columns,
+                outputType,
+                outputFields,
+                options,
+              },
+            }
           },
-        }
-      },
+        },
+        {
+          key: 'modalForm',
+          label: '弹窗表单',
+          transform(input, options) {
+            const name = input.match(/function\s(.*?)\(/)?.[1] || 'name'
+
+            const { typeName: inputType = 'InputType', fields: inputFields } = parseInterface(
+              input.split(/export default .*?\n+/)[1] || ''
+            )
+
+            const outputType = input.match(/function.*?\(.*?data:\s(\w+?)?\)/)?.[1]
+
+            const outputFields = outputType
+              ? parseInterface(input.match(new RegExp(`interface\\s${outputType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '')
+                  .fields
+              : []
+
+            return {
+              template: fs.readFileSync(`${process.cwd()}/.swagger/modalForm.ejs`, 'utf8'),
+              data: {
+                name,
+                inputType,
+                inputFields,
+                outputType,
+                outputFields,
+                options,
+              },
+            }
+          },
+        },
+        {
+          key: 'batch',
+          label: '批量管理',
+          transform(input, options) {
+            const name = input.match(/function\s(.*?)\(/)?.[1] || 'name'
+
+            const inputType = input.match(/content\?:\s(.+?)\[\]/)?.[1]
+
+            const inputFields = inputType
+              ? parseInterface(input.match(new RegExp(`interface\\s${inputType}\\s\\{[\\w\\W]+?\\}`))?.[0] || '').fields
+              : []
+
+            const { typeName: outputType = 'OutputType', fields: outputFields } = parseInterface(
+              input.split(/export default .*?\n+/)[1] || ''
+            )
+
+            return {
+              template: fs.readFileSync(`${process.cwd()}/.swagger/batch.ejs`, 'utf8'),
+              data: {
+                name,
+                inputType,
+                inputFields,
+                outputType,
+                outputFields,
+                options,
+              },
+            }
+          },
+        },
+      ],
     },
-  },
+  ],
 })

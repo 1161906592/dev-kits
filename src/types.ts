@@ -12,7 +12,7 @@ export interface Definition {
   properties: Properties
 }
 
-export type Properties = Record<string, Property>
+export type Properties = Record<string, Property | undefined>
 
 export interface Property {
   type?: JavaType
@@ -62,7 +62,7 @@ export interface RequestDefinition {
 }
 
 export interface Paths {
-  [key: string]: Record<string, RequestDefinition>
+  [key: string]: Record<string, RequestDefinition | undefined> | undefined
 }
 
 export interface Tag {
@@ -72,7 +72,7 @@ export interface Tag {
 
 export interface Swagger {
   basePath: string
-  definitions: Record<string, Definition>
+  definitions: Record<string, Definition | undefined>
   host: string
   paths: Paths
   swagger: string
