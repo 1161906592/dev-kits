@@ -1,4 +1,3 @@
-import { IncomingMessage, ServerResponse } from 'http'
 import Server, { ServerOptions } from 'http-proxy'
 import { Swagger } from './types'
 
@@ -26,11 +25,7 @@ interface Address {
 export interface ProxyOptions extends ServerOptions {
   rewrite?: (path: string, address: string) => string
   configure?: (proxy: Server, options: ProxyOptions) => void
-  bypass?: (
-    req: IncomingMessage,
-    res: ServerResponse,
-    options: ProxyOptions
-  ) => void | null | undefined | false | string
+  isPass?: (path: string, address: string) => unknown
 }
 
 export interface IConfig {

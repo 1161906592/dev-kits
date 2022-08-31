@@ -69,6 +69,7 @@ export default defineConfig({
 
       return portRewriteMap[port]()
     },
+    isPass: () => true,
   },
   address: [
     {

@@ -8,32 +8,97 @@ import { Swagger } from '../types'
 import { createCodeParser } from '../utils/codePaser'
 import { config } from '../utils/config'
 import { createMockParser } from '../utils/mockPaser'
-import { formatCode, loadSwaggerJSON, saveSwaggerJSON } from '../utils/utils'
+import { formatCode, loadMockCode, resetMockCode, saveMockCode } from '../utils/utils'
 
-class ApiController {
+export class ApiController {
+  static swaggerJSON: Promise<Swagger | null> = Promise.resolve(null)
+  static pathMap: Record<string, string | undefined> = {}
   async swagger(ctx: ParameterizedContext) {
     const url = ctx.query.url as string
-    const res = await axios.get<Swagger>(url)
-    const data = res?.data
 
-    if (data) {
-      const codeParser = createCodeParser(data, config)
-      const mockParser = createMockParser(data)
-      const paths = data.paths
+    try {
+      const swaggerJSON = axios.get<Swagger>(url).then((res) => {
+        const patchPath = config?.patchPath
 
-      Object.keys(paths).forEach((path) => {
-        Object.keys(paths[path]).forEach((method) => {
-          const { tsCode, jsCode } = codeParser(path, method)
-          paths[path][method].tsCode = tsCode
-          paths[path][method].jsCode = jsCode
-          paths[path][method].mockTemplate = JSON.stringify(mockParser(path, method), null, 2)
-          paths[path][method].mockJSON = JSON.stringify(mock(mockParser(path, method)), null, 2)
-        })
+        if (patchPath && res.data) {
+          const map: Record<string, string | undefined> = {}
+
+          Object.keys(res.data.paths).forEach((path) => {
+            map[patchPath(path, res.data).replace(/\/+/g, '/')] = path
+          })
+
+          ApiController.pathMap = map
+        }
+
+        return res.data
       })
 
-      const swaggerJSON = JSON.stringify(data, null, 2)
-      await saveSwaggerJSON(swaggerJSON)
-      ctx.body = swaggerJSON
+      ApiController.swaggerJSON = swaggerJSON
+
+      ctx.body = {
+        status: true,
+        data: await swaggerJSON,
+      }
+    } catch {
+      ctx.body = {
+        status: false,
+        message: '文档加载失败',
+      }
+    }
+  }
+
+  async apiCode(ctx: ParameterizedContext) {
+    const path = ctx.query.path as string
+    const method = ctx.query.method as string
+
+    try {
+      const swagger = await ApiController.swaggerJSON
+      if (!swagger) throw ''
+
+      const codeParser = createCodeParser(swagger, config)
+
+      ctx.body = {
+        status: true,
+        data: codeParser(path, method),
+      }
+    } catch {
+      ctx.body = {
+        status: false,
+        message: '请先加载接口文档',
+      }
+    }
+  }
+
+  async mockCode(ctx: ParameterizedContext) {
+    const path = ctx.query.path as string
+    const method = ctx.query.method as string
+
+    try {
+      const swagger = await ApiController.swaggerJSON
+      if (!swagger) throw ''
+
+      const [mockCode, jsonCode] = await Promise.all([
+        loadMockCode(path, method, 'mock'),
+        loadMockCode(path, method, 'json'),
+      ])
+
+      const mockParser = createMockParser(swagger)
+      const template = mockParser(path, method)
+
+      ctx.body = {
+        status: true,
+        data: {
+          mockSaved: !!mockCode,
+          mock: mockCode || JSON.stringify(template, null, 2),
+          jsonSaved: !!jsonCode,
+          json: jsonCode || JSON.stringify(mock(template), null, 2),
+        },
+      }
+    } catch {
+      ctx.body = {
+        status: false,
+        message: '请先加载接口文档',
+      }
     }
   }
 
@@ -43,19 +108,37 @@ class ApiController {
     } = ctx
 
     try {
-      const swaggerJSON = await loadSwaggerJSON()
-      const cur = swaggerJSON.paths[body.url][body.method]
+      const swagger = await ApiController.swaggerJSON
+      if (!swagger) throw ''
 
-      if (body.type === 'mockJSON') {
-        cur.mockJSON = body.config
-      } else {
-        cur.mockTemplate = body.config
+      const cur = swagger.paths[body.path][body.method]
+
+      if (!cur) {
+        throw ''
       }
 
-      await saveSwaggerJSON(JSON.stringify(swaggerJSON, null, 2))
-      ctx.body = '修改成功'
+      saveMockCode(body.path, body.method, body.type, body.config)
+
+      ctx.body = {
+        status: true,
+      }
     } catch {
-      ctx.body = '请先加载接口文档'
+      ctx.body = {
+        status: false,
+        message: '请先加载接口文档',
+      }
+    }
+  }
+
+  async resetMock(ctx: ParameterizedContext) {
+    const {
+      request: { body },
+    } = ctx
+
+    resetMockCode(body.path, body.method, body.type)
+
+    ctx.body = {
+      status: true,
     }
   }
 
@@ -65,16 +148,15 @@ class ApiController {
     } = ctx
 
     try {
-      const swaggerJSON = await loadSwaggerJSON()
+      const swagger = await ApiController.swaggerJSON
+      if (!swagger) throw ''
 
       const result = await Promise.all(
         (body as { path: string; method: string }[]).map(async (item) => {
-          const curPath = swaggerJSON.paths[item.path as string]
+          const curPath = swagger.paths[item.path as string]
           const tsCode = curPath[item.method as string].tsCode
 
-          const realPath = config?.patchPath
-            ? config.patchPath(item.path, swaggerJSON)
-            : `${swaggerJSON.basePath}/${item.path}`
+          const realPath = config?.patchPath ? config.patchPath(item.path, swagger) : `${swagger.basePath}/${item.path}`
 
           const filePath = `${process.cwd()}/src${`${config?.filePath ? config?.filePath(realPath) : realPath}${
             Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''
@@ -143,20 +225,33 @@ class ApiController {
     const { codegen = {}, address = [] } = config || {}
 
     ctx.body = {
-      codegen: Object.keys(codegen).map((key) => ({
-        key,
-        name: codegen[key].name,
-        options: codegen[key].options || [],
-      })),
-      address: address,
+      status: true,
+      data: {
+        codegen: Object.keys(codegen).map((key) => ({
+          key,
+          name: codegen[key].name,
+          options: codegen[key].options || [],
+        })),
+        address: address,
+      },
     }
   }
 
   async codegen(ctx: ParameterizedContext) {
-    const { template, data } =
-      config?.codegen?.[ctx.request.body.key]?.transform(ctx.request.body.input, ctx.request.body.options) || {}
+    try {
+      const { template, data } =
+        config?.codegen?.[ctx.request.body.key]?.transform(ctx.request.body.input, ctx.request.body.options) || {}
 
-    ctx.body = template ? formatCode(render(template, data)) : ''
+      ctx.body = {
+        status: true,
+        data: template ? formatCode(render(template, data)) : '',
+      }
+    } catch {
+      ctx.body = {
+        status: false,
+        mesaage: '生成失败',
+      }
+    }
   }
 }
 

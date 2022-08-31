@@ -1,11 +1,15 @@
+// import { Server } from 'node:http'
 import httpProxy from 'http-proxy'
 import { Middleware } from 'koa'
 import colors from 'picocolors'
 import { config } from '../utils/config'
 
+const logger = (type: string, from: string, to: string) =>
+  console.log(`\n${colors.bold(type)}:  ${colors.green(from)} -> ${colors.cyan(to)}`)
+
 export default function proxyMiddleware(): Middleware {
   // 当前文档地址
-  let curAddress = ''
+  let address = ''
 
   const proxy = httpProxy.createProxyServer({
     changeOrigin: true,
@@ -37,45 +41,54 @@ export default function proxyMiddleware(): Middleware {
     }
   })
 
-  return async (ctx, next) => {
-    if (ctx.path.startsWith('/__swagger__')) {
-      if (ctx.path === '/__swagger__/swagger') {
-        curAddress = ctx.query.url as string
+  // websocket
+  // if (httpServer) {
+  //   httpServer.on('upgrade', (req, socket, head) => {
+  //     const options = config?.proxy
+  //     if (!options) return
+  //     const url = req.url!
+
+  //     if ((options.ws || opts.target?.toString().startsWith('ws:')) && req.headers['sec-websocket-protocol']) {
+  //       if (options.rewrite) {
+  //         req.url = options.rewrite(url, address)
+  //       }
+
+  //       console.log(`${req.url} -> ws ${opts.target}`)
+  //       proxy.ws(req, socket, head, { target: new URL(address).origin, ...proxy })
+
+  //       return
+  //     }
+  //   })
+  // }
+
+  return async ({ req, res, path, query }, next) => {
+    if (path.startsWith('/__swagger__')) {
+      if (path === '/__swagger__/swagger') {
+        address = query.url as string
       }
 
-      return next()
+      return await next()
     }
 
     const options = config?.proxy
 
-    if (options && curAddress) {
-      if (options.bypass) {
-        const bypassResult = options.bypass(ctx.req, ctx.res, options)
-
-        if (typeof bypassResult === 'string') {
-          ctx.req.url = bypassResult
-
-          return next()
-        } else if (typeof bypassResult === 'object') {
-          Object.assign(options, bypassResult)
-
-          return next()
-        } else if (bypassResult === false) {
-          return ctx.res.end(404)
-        }
+    if (options && address) {
+      if (options.isPass?.(req.url || '', address)) {
+        return await next()
       }
 
       if (options.rewrite) {
-        ctx.req.url = options.rewrite(ctx.url, curAddress.slice(0, -'/v2/api-docs'.length))
+        const originUrl = req.url || ''
+        req.url = options.rewrite(originUrl, address.slice(0, -'/v2/api-docs'.length))
+        req.url !== originUrl && logger('Rewrite', originUrl, req.url)
       }
 
-      return await new Promise<void>((resolve) => {
-        proxy.web(ctx.req, ctx.res, { target: new URL(curAddress).origin, ...proxy }, () => {
-          resolve()
-        })
-      })
+      const opts = { target: new URL(address).origin, ...proxy }
+      logger('Proxy', req.url || '', opts.target)
+
+      return await new Promise<void>((resolve) => proxy.web(req, res, opts, () => resolve()))
     }
 
-    next()
+    await next()
   }
 }

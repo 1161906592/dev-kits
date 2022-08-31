@@ -1,44 +1,33 @@
 import { Middleware } from 'koa'
 import { mock } from 'mockjs'
-import { loadSwaggerJSON, sleep } from '../utils/utils'
+import colors from 'picocolors'
+import { ApiController } from '../controllers/ApiController'
+import { createMockParser } from '../utils/mockPaser'
+import { loadMockCode, sleep } from '../utils/utils'
 
 export default function mockMiddleware(): Middleware {
   return async (ctx, next) => {
-    if (ctx.headers['x-use-mock'] !== '1' || !ctx.headers['x-mock-type']) {
-      return await next()
+    if (ctx.path.startsWith('/__swagger__')) return await next()
+
+    const swagger = await ApiController.swaggerJSON
+    if (!swagger) return await next()
+    const pathMap = ApiController.pathMap
+
+    const path = pathMap[ctx.path]
+    if (!path) return await next()
+
+    console.log(`\n${colors.bold('Mock')}:  ${colors.green(ctx.path)}`)
+    await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
+
+    const method = ctx.method.toLocaleLowerCase()
+    ctx.type = 'json'
+
+    if (ctx.headers['x-mock-type'] === 'mock') {
+      const mockCode = await loadMockCode(path, method, 'mock')
+      ctx.body = mock(mockCode ? JSON.parse(mockCode) : createMockParser(swagger)(path, method))
+    } else {
+      const mockJSON = await loadMockCode(path, method, 'json')
+      ctx.body = mockJSON || mock(createMockParser(swagger)(path, method))
     }
-
-    try {
-      const swaggerJSON = await loadSwaggerJSON()
-
-      const realPath =
-        swaggerJSON.basePath === '/' ? ctx.path : ctx.path.substring(`/api${swaggerJSON.basePath}`.length)
-
-      if (ctx.headers['x-mock-type'] === 'mock') {
-        const mockTemplate = swaggerJSON.paths[realPath][ctx.method.toLocaleLowerCase()].mockTemplate
-
-        if (mockTemplate) {
-          await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
-          ctx.body = mock(JSON.parse(mockTemplate))
-
-          return
-        }
-      }
-
-      if (ctx.headers['x-mock-type'] === 'json') {
-        const mockJSON = swaggerJSON.paths[realPath][ctx.method.toLocaleLowerCase()].mockJSON
-
-        if (mockJSON) {
-          await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
-          ctx.body = mockJSON
-
-          return
-        }
-      }
-    } catch {
-      ctx.body = '请先加载接口文档'
-    }
-
-    await next()
   }
 }

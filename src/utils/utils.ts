@@ -1,7 +1,6 @@
-import * as fs from 'fs-extra'
+import promises from 'fs/promises'
 import { format } from 'prettier'
 import { dataDir } from '../constants'
-import { Swagger } from '../types'
 
 // 匹配引用类型的名称
 export function matchInterfaceName($ref?: string) {
@@ -12,15 +11,6 @@ export function sleep(timeout: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, timeout)
   })
-}
-
-export async function loadSwaggerJSON() {
-  return JSON.parse(await fs.readFile(`${dataDir}/api.json`, 'utf-8')) as Swagger
-}
-
-export async function saveSwaggerJSON(swaggerJSON: string) {
-  await fs.ensureFile(`${dataDir}/api.json`)
-  await fs.writeFile(`${dataDir}/api.json`, swaggerJSON, 'utf-8')
 }
 
 export function formatCode(code: string) {
@@ -38,4 +28,30 @@ export function formatCode(code: string) {
     useTabs: false,
     parser: 'typescript',
   }).replace(/\n\s*\n/g, '\n')
+}
+
+export async function saveMockCode(path: string, method: string, type: string, code: string) {
+  if (!code) return
+  const filename = `${path}-${method}-${type}`.slice(1).replace(/\//g, '+')
+  await promises.writeFile(`${dataDir}/${filename}.txt`, code, 'utf8')
+}
+
+
+export async function resetMockCode(path: string, method: string, type: string) {
+  const filename = `${path}-${method}-${type}`.slice(1).replace(/\//g, '+')
+
+  try {
+    await promises.unlink(`${dataDir}/${filename}.txt`)
+  } catch {
+    //
+  }
+}
+
+export async function loadMockCode(path: string, method: string, type: string) {
+  const filename = `${path}-${method}-${type}`.slice(1).replace(/\//g, '+')
+  try {
+    return await promises.readFile(`${dataDir}/${filename}.txt`, 'utf8')
+  } catch {
+    return ""
+  }
 }
