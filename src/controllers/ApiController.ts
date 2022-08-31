@@ -39,7 +39,9 @@ export class ApiController {
         status: true,
         data: await swaggerJSON,
       }
-    } catch {
+    } catch (e) {
+      console.error(e)
+
       ctx.body = {
         status: false,
         message: '文档加载失败',
@@ -61,7 +63,9 @@ export class ApiController {
         status: true,
         data: codeParser(path, method),
       }
-    } catch {
+    } catch (e) {
+      console.error(e)
+
       ctx.body = {
         status: false,
         message: '请先加载接口文档',
@@ -94,7 +98,9 @@ export class ApiController {
           json: jsonCode || JSON.stringify(mock(template), null, 2),
         },
       }
-    } catch {
+    } catch (e) {
+      console.error(e)
+
       ctx.body = {
         status: false,
         message: '请先加载接口文档',
@@ -122,7 +128,9 @@ export class ApiController {
       ctx.body = {
         status: true,
       }
-    } catch {
+    } catch (e) {
+      console.error(e)
+
       ctx.body = {
         status: false,
         message: '请先加载接口文档',
@@ -215,7 +223,9 @@ export class ApiController {
           ? `${disabledResult.map((d) => `${d.method.toUpperCase()}: ${d.path}`).join('、')}禁止被覆盖已跳过`
           : '同步成功',
       }
-    } catch {
+    } catch (e) {
+      console.error(e)
+
       ctx.body = {
         status: false,
         message: '请先加载接口文档',
@@ -248,7 +258,9 @@ export class ApiController {
         status: true,
         data: template ? formatCode(render(template, data)) : '',
       }
-    } catch {
+    } catch (e) {
+      console.error(e)
+
       ctx.body = {
         status: false,
         mesaage: '生成失败',
