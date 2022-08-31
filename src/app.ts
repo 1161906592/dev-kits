@@ -22,10 +22,11 @@ fs.ensureFileSync(`${dataDir}/.gitignore`)
 fs.writeFileSync(`${dataDir}/.gitignore`, '*', 'utf-8')
 
 const app = new Koa()
-app.use(cors())
-app.use(koaBody())
+// 代理中间件最高优先级
 app.use(proxyMiddleware())
 app.use(mockMiddleware())
+app.use(cors())
+app.use(koaBody())
 app.use(router.routes())
 
 app.listen('7788', () => {
