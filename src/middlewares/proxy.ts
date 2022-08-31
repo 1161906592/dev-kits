@@ -61,19 +61,23 @@ export default function proxyMiddleware(): Middleware {
   //   })
   // }
 
-  return async ({ req, res, path, query }, next) => {
+  return async (ctx, next) => {
+    const { req, res, path, query } = ctx
+
     if (path.startsWith('/__swagger__')) {
-      if (path === '/__swagger__/swagger') {
+      await next()
+
+      if (path === '/__swagger__/swagger' && ctx.body) {
         address = query.url as string
       }
 
-      return await next()
+      return
     }
 
-    const options = config?.proxy
+    const options = config?.proxy || {}
 
-    if (options && address) {
-      if (options.isPass?.(req.url || '', address)) {
+    if (address) {
+      if (options.isPass && options.isPass(req.url || '', address)) {
         return await next()
       }
 

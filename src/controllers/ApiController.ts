@@ -150,17 +150,19 @@ export class ApiController {
     try {
       const swagger = await ApiController.swaggerJSON
       if (!swagger) throw ''
+      const codeParser = createCodeParser(swagger, config)
 
       const result = await Promise.all(
         (body as { path: string; method: string }[]).map(async (item) => {
           const curPath = swagger.paths[item.path as string]
-          const tsCode = curPath[item.method as string].tsCode
+          const tsCode = codeParser(item.path, item.method).tsCode
 
           const realPath = config?.patchPath ? config.patchPath(item.path, swagger) : `${swagger.basePath}/${item.path}`
 
-          const filePath = `${process.cwd()}/src${`${config?.filePath ? config?.filePath(realPath) : realPath}${
-            Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''
-          }.ts`}`
+          const filePath = `${process.cwd()}/src${`${(config?.filePath ? config.filePath(realPath) : realPath).replace(
+            /\//g,
+            '/'
+          )}${Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''}.ts`}`
 
           // 检测是否禁止覆盖
           const isExists = await fs.pathExists(filePath)
