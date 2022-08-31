@@ -1,6 +1,6 @@
 {
   "name": "@celi/swagger-codegen",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "接口文档工具",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
