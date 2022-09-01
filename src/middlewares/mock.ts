@@ -22,12 +22,12 @@ export default function mockMiddleware(): Middleware {
     const method = ctx.method.toLocaleLowerCase()
     ctx.type = 'json'
 
-    if (ctx.headers['x-mock-type'] === 'mock') {
-      const mockCode = await loadMockCode(path, method, 'mock')
-      ctx.body = mock(mockCode ? JSON.parse(mockCode) : createMockParser(swagger)(path, method))
-    } else {
+    if (ctx.headers['x-mock-type'] === 'json') {
       const mockJSON = await loadMockCode(path, method, 'json')
       ctx.body = mockJSON || mock(createMockParser(swagger)(path, method))
+    } else {
+      const mockCode = await loadMockCode(path, method, 'mock')
+      ctx.body = mock(mockCode ? JSON.parse(mockCode) : createMockParser(swagger)(path, method))
     }
   }
 }

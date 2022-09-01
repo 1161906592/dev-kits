@@ -93,6 +93,7 @@ export class ApiController {
 
       const mockParser = createMockParser(swagger)
       const template = mockParser(path, method)
+      console.log(JSON.stringify(template, null, 2))
 
       ctx.body = {
         status: true,

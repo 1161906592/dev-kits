@@ -1,5 +1,5 @@
 import Server, { ServerOptions } from 'http-proxy'
-import { Swagger } from './types'
+import { Property, Swagger } from './types'
 
 export interface Codegen {
   label: string
@@ -18,7 +18,7 @@ export interface Codegen {
   }
 }
 
-interface Address {
+export interface Address {
   label: string
   value: string
   children?: Address[]
@@ -30,6 +30,11 @@ export interface ProxyOptions extends ServerOptions {
   isPass?: (path: string, address: string) => unknown
 }
 
+export interface MockOpions {
+  listCount?: `${number}-${number}` | number
+  template?(name: string, property: Property, deep: number): unknown
+}
+
 export interface IConfig {
   apiTemplate: string
   codegen?: Codegen[]
@@ -37,6 +42,7 @@ export interface IConfig {
   filePath?(path: string): string
   address?: Address[]
   proxy?: ProxyOptions
+  mock?: MockOpions
 }
 
 export function defineConfig(config: IConfig) {

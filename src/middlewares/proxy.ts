@@ -77,7 +77,7 @@ export default function proxyMiddleware(): Middleware {
     const options = config?.proxy || {}
 
     if (address) {
-      if (options.isPass && options.isPass(req.url || '', address)) {
+      if (options.isPass && options.isPass(ctx.path || '', address)) {
         return await next()
       }
 
