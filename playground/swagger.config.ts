@@ -89,32 +89,7 @@ export default defineConfig({
       ],
     },
   ],
-  apiTemplate: `
-  import { request } from "@celi/shared"
-  
-  <% interfaces.forEach(function(item){ %>
-  export interface <%- item.name %> {
-    <% item.props.forEach(function(prop){ %>
-      <%- prop.name %><% if (!prop.required) { %>?<% } %>: <%- prop.type %><% if (prop.description || prop.format) { %>// <% } %><% if (prop.description) { %><%- prop.description %> <% } %><% if (prop.format) { %><%- prop.format %> <% } %>
-    <% }); %>
-  }
-  <% }); %>
-  
-  <% if (comment) { %>// <%- comment %><% } %>
-  async function <%- name %>(<%- args %>) {
-    const res = await request({
-      url: <%- path %>,
-      method: <%- method %>,
-      <% if(query) { %>
-      params: query,
-      <% } %>
-      <% if(data) { %>
-      data,
-      <% } %>
-    })
-    return res.data<% if(responseBody) { %> as <%- responseBody %> <% } %>
-  }
-  export default <%- name %>`,
+  apiTemplate: fs.readFileSync(`${process.cwd()}/.swagger/apiTemplate.ejs`, 'utf8'),
   codegen: [
     {
       key: 'fragment',

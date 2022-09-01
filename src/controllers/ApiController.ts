@@ -4,6 +4,7 @@ import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
 import { mock } from 'mockjs'
+import colors from 'picocolors'
 import { Swagger } from '../types'
 import { createCodeParser } from '../utils/codePaser'
 import { config } from '../utils/config'
@@ -16,15 +17,17 @@ export class ApiController {
   async swagger(ctx: ParameterizedContext) {
     const url = ctx.query.url as string
 
+    console.log(`\n${colors.bold('Pull swagger')}:  ${colors.green(url)}`)
+
     try {
       const swaggerJSON = axios.get<Swagger>(url).then((res) => {
         const patchPath = config?.patchPath
 
-        if (patchPath && res.data) {
+        if (res.data) {
           const map: Record<string, string | undefined> = {}
 
           Object.keys(res.data.paths).forEach((path) => {
-            map[patchPath(path, res.data).replace(/\/+/g, '/')] = path
+            map[(patchPath?.(path, res.data) || path).replace(/\/+/g, '/')] = path
           })
 
           ApiController.pathMap = map
@@ -40,6 +43,7 @@ export class ApiController {
         data: await swaggerJSON,
       }
     } catch (e) {
+      console.log()
       console.error(e)
 
       ctx.body = {
@@ -64,6 +68,7 @@ export class ApiController {
         data: codeParser(path, method),
       }
     } catch (e) {
+      console.log()
       console.error(e)
 
       ctx.body = {
@@ -99,6 +104,7 @@ export class ApiController {
         },
       }
     } catch (e) {
+      console.log()
       console.error(e)
 
       ctx.body = {
@@ -129,6 +135,7 @@ export class ApiController {
         status: true,
       }
     } catch (e) {
+      console.log()
       console.error(e)
 
       ctx.body = {
@@ -226,6 +233,7 @@ export class ApiController {
           : '同步成功',
       }
     } catch (e) {
+      console.log()
       console.error(e)
 
       ctx.body = {
@@ -259,6 +267,7 @@ export class ApiController {
         data: template ? formatCode(render(template, data)) : '',
       }
     } catch (e) {
+      console.log()
       console.error(e)
 
       ctx.body = {
