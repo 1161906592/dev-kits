@@ -1,5 +1,4 @@
 import { Middleware } from 'koa'
-import { mock } from 'mockjs'
 import colors from 'picocolors'
 import { ApiController } from '../controllers/ApiController'
 import { createMockParser } from '../utils/mockPaser'
@@ -24,10 +23,10 @@ export default function mockMiddleware(): Middleware {
 
     if (ctx.headers['x-mock-type'] === 'json') {
       const mockJSON = await loadMockCode(path, method, 'json')
-      ctx.body = mockJSON || mock(createMockParser(swagger)(path, method))
+      ctx.body = mockJSON || require('../mock').mock(createMockParser(swagger)(path, method))
     } else {
       const mockCode = await loadMockCode(path, method, 'mock')
-      ctx.body = mock(mockCode ? JSON.parse(mockCode) : createMockParser(swagger)(path, method))
+      ctx.body = require('../mock').mock(mockCode ? JSON.parse(mockCode) : createMockParser(swagger)(path, method))
     }
   }
 }

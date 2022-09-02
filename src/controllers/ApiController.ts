@@ -3,7 +3,6 @@ import { render } from 'ejs'
 import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
-import { mock } from 'mockjs'
 import colors from 'picocolors'
 import { Swagger } from '../types'
 import { createCodeParser } from '../utils/codePaser'
@@ -93,7 +92,6 @@ export class ApiController {
 
       const mockParser = createMockParser(swagger)
       const template = mockParser(path, method)
-      console.log(JSON.stringify(template, null, 2))
 
       ctx.body = {
         status: true,
@@ -101,7 +99,7 @@ export class ApiController {
           mockSaved: !!mockCode,
           mock: mockCode || JSON.stringify(template, null, 2),
           jsonSaved: !!jsonCode,
-          json: jsonCode || JSON.stringify(mock(template), null, 2),
+          json: jsonCode || JSON.stringify(require('../mock').mock(template), null, 2),
         },
       }
     } catch (e) {
