@@ -9,6 +9,7 @@ import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
 import router from './routes/routes'
 import { parseConfig } from './utils/config'
+import { pathMock } from './utils/pathMock'
 
 const watcher = chokidar.watch(`${process.cwd()}/${defaultConfigFile}`)
 
@@ -17,6 +18,8 @@ parseConfig()
 watcher.on('change', async () => {
   parseConfig()
 })
+
+pathMock()
 
 fs.ensureFileSync(`${dataDir}/.gitignore`)
 fs.writeFileSync(`${dataDir}/.gitignore`, '*', 'utf-8')
