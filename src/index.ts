@@ -28,6 +28,7 @@ export interface ProxyOptions extends ServerOptions {
   rewrite?: (path: string, address: string) => string
   configure?: (proxy: Server, options: ProxyOptions) => void
   isPass?: (path: string, address: string) => unknown
+  websocket?: Record<string, string>
 }
 
 export interface MockOpions {

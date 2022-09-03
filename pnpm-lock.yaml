@@ -11,6 +11,7 @@ specifiers:
   '@types/mockjs': ^1.0.6
   '@types/node': ^18.7.13
   '@types/prettier': ^2.7.0
+  '@types/ws': ^8.5.3
   axios: ^0.27.2
   chokidar: ^3.5.3
   dayjs: ^1.11.5
@@ -31,6 +32,7 @@ specifiers:
   prettier: ^2.7.1
   typescript: ^4.8.2
   vm2: ^3.9.11
+  ws: ^8.8.1
 
 dependencies:
   axios: registry.npmjs.org/axios/0.27.2
@@ -50,6 +52,7 @@ dependencies:
   picocolors: registry.npmjs.org/picocolors/1.0.0
   prettier: registry.npmjs.org/prettier/2.7.1
   vm2: registry.npmjs.org/vm2/3.9.11
+  ws: registry.npmjs.org/ws/8.8.1
 
 devDependencies:
   '@celi/eslint-config': 0.1.0_s2uh3a3adc7wqlifljmasdmyte
@@ -62,6 +65,7 @@ devDependencies:
   '@types/mockjs': registry.npmjs.org/@types/mockjs/1.0.6
   '@types/node': registry.npmjs.org/@types/node/18.7.13
   '@types/prettier': registry.npmjs.org/@types/prettier/2.7.0
+  '@types/ws': registry.npmjs.org/@types/ws/8.5.3
   eslint: registry.npmjs.org/eslint/8.22.0
   esno: registry.npmjs.org/esno/0.16.3
   typescript: registry.npmjs.org/typescript/4.8.2
@@ -403,6 +407,14 @@ packages:
     version: 1.15.0
     dependencies:
       '@types/mime': registry.npmjs.org/@types/mime/3.0.1
+      '@types/node': registry.npmjs.org/@types/node/18.7.13
+    dev: true
+
+  registry.npmjs.org/@types/ws/8.5.3:
+    resolution: {integrity: sha512-6YOoWjruKj1uLf3INHH7D3qTXwFfEsg1kf3c0uDdSBJwfa/llkwIjrAGV7j7mVgGNbzTQ3HiHKKDXl6bJPD97w==, registry: http://192.168.50.114:7001/, tarball: https://registry.npmjs.org/@types/ws/-/ws-8.5.3.tgz}
+    name: '@types/ws'
+    version: 8.5.3
+    dependencies:
       '@types/node': registry.npmjs.org/@types/node/18.7.13
     dev: true
 
@@ -3478,6 +3490,21 @@ packages:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==, registry: http://192.168.50.114:7001/, tarball: https://registry.npmjs.org/wrappy/-/wrappy-1.0.2.tgz}
     name: wrappy
     version: 1.0.2
+
+  registry.npmjs.org/ws/8.8.1:
+    resolution: {integrity: sha512-bGy2JzvzkPowEJV++hF07hAD6niYSr0JzBNo/J29WsB57A2r7Wlc1UFcTR9IzrPvuNVO4B8LGqF8qcpsVOhJCA==, registry: http://192.168.50.114:7001/, tarball: https://registry.npmjs.org/ws/-/ws-8.8.1.tgz}
+    name: ws
+    version: 8.8.1
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: ^5.0.2
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+    dev: false
 
   registry.npmjs.org/yallist/4.0.0:
     resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==, registry: http://192.168.50.114:7001/, tarball: https://registry.npmjs.org/yallist/-/yallist-4.0.0.tgz}

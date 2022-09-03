@@ -65,6 +65,28 @@ export async function loadMockCode(path: string, method: string, type: string) {
   }
 }
 
+// 保存websocket推送配置记录
+export async function saveWSRecords(records: string[]) {
+  const filename = 'websocket-records'
+
+  try {
+    await promises.writeFile(`${dataDir}/${filename}.txt`, records.join('\n'), 'utf8')
+  } catch {
+    //
+  }
+}
+
+// 加载websocket推送配置记录
+export async function loadWSRecords(): Promise<string[]> {
+  const filename = 'websocket-records'
+
+  try {
+    return (await promises.readFile(`${dataDir}/${filename}.txt`, 'utf8')).split('\n')
+  } catch {
+    return []
+  }
+}
+
 export function findCodegen(codegen: Codegen[], key: string) {
   let target: Codegen | undefined = undefined
 
