@@ -1,10 +1,9 @@
 import chokidar from 'chokidar'
-import fs from 'fs-extra'
 import Koa from 'koa'
 import koaBody from 'koa-body'
 import cors from 'koa2-cors'
 import colors from 'picocolors'
-import { dataDir, defaultConfigFile } from './constants'
+import { defaultConfigFile } from './constants'
 import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
 import router from './routes/routes'
@@ -20,9 +19,6 @@ watcher.on('change', async () => {
 })
 
 pathMock()
-
-fs.ensureFileSync(`${dataDir}/.gitignore`)
-fs.writeFileSync(`${dataDir}/.gitignore`, '*', 'utf-8')
 
 const app = new Koa()
 // 代理中间件最高优先级

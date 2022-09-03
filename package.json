@@ -51,7 +51,9 @@
   "dependencies": {
     "axios": "^0.27.2",
     "chokidar": "^3.5.3",
+    "dayjs": "^1.11.5",
     "ejs": "^3.1.8",
+    "esbuild": "^0.15.6",
     "execa": "^4.0.2",
     "fs-extra": "^10.1.0",
     "http-proxy": "^1.18.1",
@@ -62,6 +64,7 @@
     "koa2-cors": "^2.0.6",
     "mockjs": "^1.1.0",
     "picocolors": "^1.0.0",
-    "prettier": "^2.7.1"
+    "prettier": "^2.7.1",
+    "vm2": "^3.9.11"
   }
 }

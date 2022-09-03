@@ -78,3 +78,19 @@ export function createMockParser(swaggerJSON: Swagger) {
     )
   }
 }
+
+export function createScriptParser(swaggerJSON: Swagger) {
+  return (path: string, method: string) => {
+    return `export default ({ Mockjs }) => {
+      return Mockjs.mock(${JSON.stringify(
+        resolveMockTemplate(
+          swaggerJSON.paths[path]?.[method]?.responses[200].schema?.$ref,
+          swaggerJSON.definitions,
+          []
+        ),
+        null,
+        2
+      )})
+    }`
+  }
+}

@@ -1,5 +1,6 @@
 import promises from 'fs/promises'
 import { format } from 'prettier'
+import { NodeVM } from 'vm2'
 import { Codegen } from '..'
 import { dataDir } from '../constants'
 
@@ -15,20 +16,27 @@ export function sleep(timeout: number) {
 }
 
 export function formatCode(code: string) {
-  return format(code, {
-    printWidth: 120,
-    semi: false,
-    singleQuote: true,
-    trailingComma: 'es5',
-    bracketSpacing: true,
-    jsxSingleQuote: false,
-    arrowParens: 'always',
-    proseWrap: 'never',
-    endOfLine: 'auto',
-    insertPragma: false,
-    useTabs: false,
-    parser: 'typescript',
-  }).replace(/\n\s*\n/g, '\n')
+  try {
+    return format(code, {
+      printWidth: 120,
+      semi: false,
+      singleQuote: true,
+      trailingComma: 'es5',
+      bracketSpacing: true,
+      jsxSingleQuote: false,
+      arrowParens: 'always',
+      proseWrap: 'never',
+      endOfLine: 'auto',
+      insertPragma: false,
+      useTabs: false,
+      parser: 'typescript',
+    }).replace(/\n\s*\n/g, '\n')
+  } catch (e) {
+    console.log()
+    console.error(e)
+
+    return code
+  }
 }
 
 export async function saveMockCode(path: string, method: string, type: string, code: string) {
@@ -79,4 +87,20 @@ export function findCodegen(codegen: Codegen[], key: string) {
   fn(codegen)
 
   return target as Codegen | undefined
+}
+
+const vm = new NodeVM({
+  console: 'inherit',
+})
+
+// 沙箱执行脚本
+export async function runScriptInSandbox(code: string) {
+  const result = await require('esbuild').transform(code, {
+    target: ['node14.18', 'node16'],
+    platform: 'node',
+    format: 'cjs',
+    sourcemap: false,
+  })
+
+  return vm.run(result.code).default
 }

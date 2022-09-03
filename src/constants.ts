@@ -1,5 +1,3 @@
 export const defaultConfigFile = 'swagger.config.ts'
 
-export const rootDir = `${process.cwd()}/.swagger`
-
-export const dataDir = `${rootDir}/data`
+export const dataDir = `${process.cwd()}/node_modules/.cache/swagger`

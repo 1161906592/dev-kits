@@ -8,7 +8,7 @@ import colors from 'picocolors'
 import { Swagger } from '../types'
 import { createCodeParser } from '../utils/codePaser'
 import { config } from '../utils/config'
-import { createMockParser } from '../utils/mockPaser'
+import { createMockParser, createScriptParser } from '../utils/mockPaser'
 import { findCodegen, formatCode, loadMockCode, resetMockCode, saveMockCode } from '../utils/utils'
 
 export class ApiController {
@@ -81,27 +81,33 @@ export class ApiController {
   async mockCode(ctx: ParameterizedContext) {
     const path = ctx.query.path as string
     const method = ctx.query.method as string
+    const type = ctx.query.type as string
 
     try {
       const swagger = await ApiController.swaggerJSON
       if (!swagger) throw ''
 
-      const [mockCode, jsonCode] = await Promise.all([
-        loadMockCode(path, method, 'mock'),
-        loadMockCode(path, method, 'json'),
-      ])
+      const mockCode = await loadMockCode(path, method, 'mock')
+      const template = createMockParser(swagger)(path, method)
+      let saved = false
+      let code = ''
 
-      const mockParser = createMockParser(swagger)
-      const template = mockParser(path, method)
+      if (type === 'json') {
+        const jsonCode = await loadMockCode(path, method, 'json')
+        saved = !!jsonCode
+        code = jsonCode || JSON.stringify(mock(mockCode ? JSON.parse(mockCode) : template), null, 2)
+      } else if (type === 'script') {
+        const scriptCode = await loadMockCode(path, method, 'script')
+        saved = !!scriptCode
+        code = formatCode(scriptCode || createScriptParser(swagger)(path, method))
+      } else {
+        saved = !!mockCode
+        code = mockCode || JSON.stringify(template, null, 2)
+      }
 
       ctx.body = {
         status: true,
-        data: {
-          mockSaved: !!mockCode,
-          mock: mockCode || JSON.stringify(template, null, 2),
-          jsonSaved: !!jsonCode,
-          json: jsonCode || JSON.stringify(mock(mockCode ? JSON.parse(mockCode) : template), null, 2),
-        },
+        data: { saved, code },
       }
     } catch (e) {
       console.log()
