@@ -1,22 +1,21 @@
 import { Middleware } from 'koa'
 import { mock } from 'mockjs'
 import colors from 'picocolors'
-import { ApiController } from '../controllers/ApiController'
-import { createMockParser, createScriptParser } from '../utils/mockPaser'
-import { runScriptInSandbox, loadMockCode, sleep } from '../utils/utils'
+import { createMockParser, createScriptParser } from '../common/mockPaser'
+import { loadMockCode } from '../common/repository'
+import { runScriptInSandbox, sleep } from '../common/utils'
 
 export default function mockMiddleware(): Middleware {
   return async (ctx, next) => {
     if (ctx.path.startsWith('/__swagger__')) return await next()
 
-    const swagger = await ApiController.swaggerJSON
+    const { swagger, pathMap } = await ctx.state.loadSwagger()
     if (!swagger) return await next()
-    const pathMap = ApiController.pathMap
 
     const path = pathMap[ctx.path]
     if (!path) return await next()
 
-    console.log(`\n${colors.bold('Mock')}:  ${colors.green(ctx.path)}`)
+    console.log(`${colors.bold('Mock')}:  ${colors.green(ctx.path)}`)
     await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
 
     try {
@@ -28,16 +27,18 @@ export default function mockMiddleware(): Middleware {
         const mockJSON = mockCode ? mock(mockCode) : await loadMockCode(path, method, 'json')
         ctx.body = mockJSON || mock(createMockParser(swagger)(path, method))
       } else if (mockType === 'script') {
-        const scriptCode = await loadMockCode(path, method, 'script')
-        const dataMocker = await runScriptInSandbox(scriptCode || createScriptParser(swagger)(path, method))
-        ctx.body = await dataMocker({ Mockjs: require('mockjs'), dayjs: require('dayjs') })
+        const { code } = JSON.parse(await loadMockCode(path, method, 'script'))
+
+        ctx.body = await runScriptInSandbox(code || createScriptParser(swagger)(path, method))({
+          Mockjs: require('mockjs'),
+          dayjs: require('dayjs'),
+        })
       } else {
         ctx.body = mock(mockCode ? JSON.parse(mockCode) : createMockParser(swagger)(path, method))
       }
 
       ctx.type = 'json'
     } catch (e) {
-      console.log()
       console.error(e)
       ctx.status === 500
     }

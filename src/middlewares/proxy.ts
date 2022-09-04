@@ -1,18 +1,23 @@
 import { Server } from 'node:http'
-import { parse } from 'node:url'
+import { FSWatcher } from 'chokidar'
 import httpProxy from 'http-proxy'
 import { Middleware } from 'koa'
 import colors from 'picocolors'
 import { WebSocket, WebSocketServer } from 'ws'
-import { config } from '../utils/config'
-import { loadMockCode } from '../utils/utils'
+import { config } from '../common/config'
+import { loadMockCode } from '../common/repository'
+import { runScriptInSandbox } from '../common/utils'
 
 const logger = (type: string, from: string, to: string) =>
-  console.log(`\n${colors.bold(type)}:  ${colors.green(from)} -> ${colors.cyan(to)}`)
+  console.log(`${colors.bold(type)}:  ${colors.green(from)} -> ${colors.cyan(to)}`)
 
-export default function proxyMiddleware(server: Server): Middleware {
+export default function proxyMiddleware(server: Server, watcher: FSWatcher): Middleware {
   // 当前文档地址
   let address = ''
+
+  const setAddress = (_address: string) => {
+    address = _address
+  }
 
   const proxy = httpProxy.createProxyServer({
     changeOrigin: true,
@@ -52,79 +57,119 @@ export default function proxyMiddleware(server: Server): Middleware {
   const socketMap = new Map<string, Set<WebSocket>>()
 
   ws.on('connection', (socket, req) => {
-    const { pathname } = parse(req.url || '')
-    if (!pathname) return
-    let socketSet = socketMap.get(pathname)
+    const url = req.url || ''
+    if (!url) return
+    let socketSet = socketMap.get(url)
 
     if (!socketSet) {
       socketSet = new Set()
-      socketMap.set(pathname, socketSet)
+      socketMap.set(url, socketSet)
     }
 
     socketSet.add(socket)
 
     console.log(
-      `\n${colors.bold('Websocket connection')}:  ${colors.cyan(pathname)}  当前连接数: ${colors.cyan(socketSet.size)}`
+      `${colors.bold('Websocket connection')}:  ${colors.cyan(url)}  当前连接数: ${colors.cyan(socketSet.size)}`
     )
 
     const remove = (type: string) => {
       socketSet?.delete(socket)
 
       console.log(
-        `\n${colors.bold(`Websocket ${type}`)}:  ${colors.cyan(pathname)}  当前连接数: ${colors.cyan(socketSet?.size)}`
+        `${colors.bold(`Websocket ${type}`)}:  ${colors.cyan(url)}  当前连接数: ${colors.cyan(socketSet?.size)}`
       )
 
       if (!socketSet?.size) {
-        stopPush(pathname)
-        socketMap.delete(pathname)
+        stopPush(url)
+        socketMap.delete(url)
       }
     }
 
     socket.on('close', () => remove('close'))
-
     socket.on('error', () => remove('error'))
 
-    startPush(pathname)
+    startPush(url)
   })
 
   const timerMap = new Map<string, NodeJS.Timer>()
 
-  const startPush = (path: string) => {
-    if (timerMap.get(path)) return
-    console.log(`\n${colors.bold('Websocket startPush')}:  ${colors.cyan(path)}`)
+  watcher.on('change', () => {
+    const options = config?.proxy || {}
+    const opts = options.websocket
 
-    const loop = async () => {
-      const socketSet = socketMap.get(path)
-      if (!socketSet?.size) return stopPush(path)
-      const code = await loadMockCode(path, 'ws', 'ws')
+    if (opts) {
+      Array.from(socketMap.keys()).forEach((url) => {
+        for (const context in opts) {
+          if (doesProxyContextMatchUrl(context, url)) {
+            if (!opts[context].startsWith('ws') || !options.isPass || !options.isPass(url, address)) {
+              // 断开连接
+              socketMap.get(url)?.forEach((socket) => socket.close())
+              socketMap.delete(url)
+            }
 
-      if (!code || !socketSet.size) return stopPush(path)
-
-      socketSet.forEach((socket) => {
-        socket.send(code)
+            return
+          }
+        }
+      })
+    } else {
+      // 全部断开
+      socketMap.forEach((socketSet) => {
+        socketSet.forEach((socket) => socket.close())
       })
 
-      timerMap.set(
-        path,
-        setTimeout(() => loop(), 1000)
-      )
+      socketMap.clear()
+    }
+  })
+
+  const startPush = (path: string) => {
+    if (timerMap.get(path)) return
+
+    const push = async () => {
+      const socketSet = socketMap.get(path)
+      if (!socketSet?.size) return stopPush(path)
+      let content
+
+      try {
+        // todo 待优化
+        content = await loadMockCode(path, 'ws', 'ws')
+      } catch (e) {
+        console.error(e)
+      }
+
+      if (!content || !socketSet.size) return stopPush(path)
+      const { interval, code } = JSON.parse(content)
+      console.log(`${colors.bold('Websocket push')}:  ${colors.cyan(path)}`)
+
+      try {
+        const data = JSON.stringify(
+          // todo 待优化
+          await runScriptInSandbox(code)({ Mockjs: require('mockjs'), dayjs: require('dayjs') })
+        )
+
+        socketSet.forEach((socket) => {
+          socket.send(data)
+        })
+      } catch (e) {
+        console.error(e)
+      } finally {
+        timerMap.set(
+          path,
+          setTimeout(() => push(), interval)
+        )
+      }
     }
 
-    loop()
+    push()
   }
 
   const stopPush = (path: string) => {
     const timer = timerMap.get(path)
 
     if (timer) {
-      console.log(`\n${colors.bold('Websocket stopPush')}:  ${colors.cyan(path)}`)
+      console.log(`${colors.bold('Websocket stopPush')}:  ${colors.cyan(path)}`)
       clearTimeout(timer)
       timerMap.delete(path)
     }
-  }
-
-  const isPushing = (path: string) => {
-    return !!timerMap.get(path)
   }
 
   // websocket
@@ -134,6 +179,12 @@ export default function proxyMiddleware(server: Server): Middleware {
 
     if (opts) {
       for (const context in opts) {
+        if (!opts[context].startsWith('ws')) {
+          console.log(`${colors.red(opts[context])} is not a websocket url!`)
+
+          continue
+        }
+
         if (doesProxyContextMatchUrl(context, req.url || '')) {
           if (options.isPass && options.isPass(req.url || '', address)) {
             // mock
@@ -149,7 +200,7 @@ export default function proxyMiddleware(server: Server): Middleware {
             }
 
             logger('Websocket', req.url || '', opts[context])
-            proxy.ws(req, socket, head, { target: opts[context], ...proxy })
+            proxy.ws(req, socket, head, { target: opts[context], ...options })
           }
 
           return
@@ -161,17 +212,12 @@ export default function proxyMiddleware(server: Server): Middleware {
   })
 
   return async (ctx, next) => {
-    const { req, res, path, query } = ctx
+    const { req, res, path } = ctx
+    ctx.state.setAddress = setAddress
+    ctx.state.startPush = startPush
+    ctx.state.stopPush = stopPush
 
-    if (path.startsWith('/__swagger__')) {
-      await next()
-
-      if (path === '/__swagger__/swagger' && ctx.body) {
-        address = query.url as string
-      }
-
-      return
-    }
+    if (path.startsWith('/__swagger__')) return await next()
 
     const options = config?.proxy || {}
 
@@ -190,12 +236,6 @@ export default function proxyMiddleware(server: Server): Middleware {
       logger('Proxy', req.url || '', opts.target)
 
       return await new Promise<void>((resolve) => proxy.web(req, res, opts, () => resolve()))
-    }
-
-    ctx.state.ws = {
-      startPush,
-      stopPush,
-      isPushing,
     }
 
     await next()

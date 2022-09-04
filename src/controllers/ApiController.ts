@@ -1,49 +1,24 @@
-import axios from 'axios'
 import { render } from 'ejs'
 import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
-import { mock } from 'mockjs'
 import colors from 'picocolors'
-import { Swagger } from '../types'
-import { createCodeParser } from '../utils/codePaser'
-import { config } from '../utils/config'
-import { createMockParser, createScriptParser } from '../utils/mockPaser'
-import { findCodegen, formatCode, loadMockCode, resetMockCode, saveMockCode } from '../utils/utils'
+import { createCodeParser } from '../common/codePaser'
+import { config } from '../common/config'
+import { findCodegen, formatCode } from '../common/utils'
 
-export class ApiController {
-  static swaggerJSON: Promise<Swagger | null> = Promise.resolve(null)
-  static pathMap: Record<string, string | undefined> = {}
+class ApiController {
   async swagger(ctx: ParameterizedContext) {
     const url = ctx.query.url as string
 
-    console.log(`\n${colors.bold('Pull swagger')}:  ${colors.green(url)}`)
+    console.log(`${colors.bold('Pull swagger')}:  ${colors.green(url)}`)
 
     try {
-      const swaggerJSON = axios.get<Swagger>(url).then((res) => {
-        const patchPath = config?.patchPath
-
-        if (res.data) {
-          const map: Record<string, string | undefined> = {}
-
-          Object.keys(res.data.paths).forEach((path) => {
-            map[(patchPath?.(path, res.data) || path).replace(/\/+/g, '/')] = path
-          })
-
-          ApiController.pathMap = map
-        }
-
-        return res.data
-      })
-
-      ApiController.swaggerJSON = swaggerJSON
-
       ctx.body = {
         status: true,
-        data: await swaggerJSON,
+        data: (await ctx.state.loadSwagger(url)).swagger,
       }
     } catch (e) {
-      console.log()
       console.error(e)
 
       ctx.body = {
@@ -58,7 +33,7 @@ export class ApiController {
     const method = ctx.query.method as string
 
     try {
-      const swagger = await ApiController.swaggerJSON
+      const swagger = (await ctx.state.loadSwagger()).swagger
       if (!swagger) throw ''
 
       const codeParser = createCodeParser(swagger, config)
@@ -68,98 +43,12 @@ export class ApiController {
         data: codeParser(path, method),
       }
     } catch (e) {
-      console.log()
       console.error(e)
 
       ctx.body = {
         status: false,
         message: '请先加载接口文档',
       }
-    }
-  }
-
-  async mockCode(ctx: ParameterizedContext) {
-    const path = ctx.query.path as string
-    const method = ctx.query.method as string
-    const type = ctx.query.type as string
-
-    try {
-      const swagger = await ApiController.swaggerJSON
-      if (!swagger) throw ''
-
-      const mockCode = await loadMockCode(path, method, 'mock')
-      const template = createMockParser(swagger)(path, method)
-      let saved = false
-      let code = ''
-
-      if (type === 'json') {
-        const jsonCode = await loadMockCode(path, method, 'json')
-        saved = !!jsonCode
-        code = jsonCode || JSON.stringify(mock(mockCode ? JSON.parse(mockCode) : template), null, 2)
-      } else if (type === 'script') {
-        const scriptCode = await loadMockCode(path, method, 'script')
-        saved = !!scriptCode
-        code = formatCode(scriptCode || createScriptParser(swagger)(path, method))
-      } else {
-        saved = !!mockCode
-        code = mockCode || JSON.stringify(template, null, 2)
-      }
-
-      ctx.body = {
-        status: true,
-        data: { saved, code },
-      }
-    } catch (e) {
-      console.log()
-      console.error(e)
-
-      ctx.body = {
-        status: false,
-        message: '请先加载接口文档',
-      }
-    }
-  }
-
-  async updateMock(ctx: ParameterizedContext) {
-    const {
-      request: { body },
-    } = ctx
-
-    try {
-      const swagger = await ApiController.swaggerJSON
-      if (!swagger) throw ''
-
-      const cur = swagger.paths?.[body.path]?.[body.method]
-
-      if (!cur) {
-        throw ''
-      }
-
-      saveMockCode(body.path, body.method, body.type, body.config)
-
-      ctx.body = {
-        status: true,
-      }
-    } catch (e) {
-      console.log()
-      console.error(e)
-
-      ctx.body = {
-        status: false,
-        message: '请先加载接口文档',
-      }
-    }
-  }
-
-  async resetMock(ctx: ParameterizedContext) {
-    const {
-      request: { body },
-    } = ctx
-
-    resetMockCode(body.path, body.method, body.type)
-
-    ctx.body = {
-      status: true,
     }
   }
 
@@ -169,7 +58,7 @@ export class ApiController {
     } = ctx
 
     try {
-      const swagger = await ApiController.swaggerJSON
+      const swagger = (await ctx.state.loadSwagger()).swagger
       if (!swagger) throw ''
       const codeParser = createCodeParser(swagger, config)
 
@@ -239,7 +128,6 @@ export class ApiController {
           : '同步成功',
       }
     } catch (e) {
-      console.log()
       console.error(e)
 
       ctx.body = {
@@ -273,7 +161,6 @@ export class ApiController {
         data: template ? formatCode(render(template, data)) : '',
       }
     } catch (e) {
-      console.log()
       console.error(e)
 
       ctx.body = {

@@ -4,17 +4,18 @@ import Koa from 'koa'
 import koaBody from 'koa-body'
 import cors from 'koa2-cors'
 import colors from 'picocolors'
+import { parseConfig } from './common/config'
+import { pathMock } from './common/pathMock'
 import { defaultConfigFile } from './constants'
 import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
+import swaggerMiddleware from './middlewares/swagger'
 import router from './routes/routes'
-import { parseConfig } from './utils/config'
-import { pathMock } from './utils/pathMock'
-
-const watcher = chokidar.watch(`${process.cwd()}/${defaultConfigFile}`)
 
 parseConfig()
 pathMock()
+
+const watcher = chokidar.watch(`${process.cwd()}/${defaultConfigFile}`)
 
 watcher.on('change', async () => {
   parseConfig()
@@ -23,8 +24,9 @@ watcher.on('change', async () => {
 const app = new Koa()
 const server = http.createServer(app.callback())
 // 代理中间件最高优先级
-app.use(proxyMiddleware(server))
+app.use(proxyMiddleware(server, watcher))
 app.use(cors())
+app.use(swaggerMiddleware())
 app.use(mockMiddleware())
 app.use(koaBody())
 app.use(router.routes())

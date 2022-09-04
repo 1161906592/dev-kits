@@ -46,7 +46,7 @@ function resolveInterface(
     const property = properties[propName]
 
     if (!property) {
-      console.log(`\nthe ${colors.red(colors.bold(propName))} attribute is not found`)
+      console.log(`the ${colors.red(colors.bold(propName))} attribute is not found`)
 
       return
     }
@@ -55,7 +55,7 @@ function resolveInterface(
     const tsKeyword = $ref ? $ref : type ? javaTypeToTsKeyword(type, items) : null
 
     if (!tsKeyword) {
-      console.log(`\nthe ${colors.red(colors.bold(propName))} attribute of the ${$ref} is ignored`)
+      console.log(`the ${colors.red(colors.bold(propName))} attribute of the ${$ref} is ignored`)
 
       return
     }
@@ -116,7 +116,7 @@ function resolveQueryOrPath(
       : null
 
     if (!tsKeyword) {
-      console.log(`\nthe ${colors.red(colors.bold(name))} attribute of the ${interfaceName} is ignored`)
+      console.log(`the ${colors.red(colors.bold(name))} attribute of the ${interfaceName} is ignored`)
 
       return
     }

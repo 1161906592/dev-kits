@@ -1,18 +1,22 @@
 import KoaRouter from 'koa-router'
 import api from '../controllers/ApiController'
+import mock from '../controllers/MockController'
+import ws from '../controllers/WSController'
 
 const router = new KoaRouter({ prefix: '/__swagger__' })
 
-router.get('/swagger', api.swagger)
-router.get('/config', api.config)
+router.get('/api/swagger', api.swagger)
+router.get('/api/config', api.config)
+router.get('/api/apiCode', api.apiCode)
+router.post('/api/syncCode', api.syncCode)
+router.post('/api/codegen', api.codegen)
 
-router.get('/apiCode', api.apiCode)
-router.post('/syncCode', api.syncCode)
+router.get('/mock/mockCode', mock.mockCode)
+router.post('/mock/updateMock', mock.updateMock)
+router.post('/mock/resetMock', mock.resetMock)
 
-router.get('/mockCode', api.mockCode)
-router.post('/updateMock', api.updateMock)
-router.post('/resetMock', api.resetMock)
-
-router.post('/codegen', api.codegen)
+router.get('/ws/records', ws.records)
+router.post('/ws/save', ws.save)
+router.post('/ws/remove', ws.remove)
 
 export default router
