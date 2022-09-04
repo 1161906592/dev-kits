@@ -27,7 +27,8 @@ export default function mockMiddleware(): Middleware {
         const mockJSON = mockCode ? mock(mockCode) : await loadMockCode(path, method, 'json')
         ctx.body = mockJSON || mock(createMockParser(swagger)(path, method))
       } else if (mockType === 'script') {
-        const { code } = JSON.parse(await loadMockCode(path, method, 'script'))
+        const content = await loadMockCode(path, method, 'script')
+        const { code = '' } = content ? JSON.parse(content) : {}
 
         ctx.body = await runScriptInSandbox(code || createScriptParser(swagger)(path, method))({
           Mockjs: require('mockjs'),

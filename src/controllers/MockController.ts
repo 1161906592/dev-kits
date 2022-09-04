@@ -24,7 +24,8 @@ class MockController {
         saved = !!jsonCode
         code = jsonCode || JSON.stringify(mock(mockCode ? JSON.parse(mockCode) : template), null, 2)
       } else if (type === 'script') {
-        const { raw } = JSON.parse(await loadMockCode(path, method, 'script'))
+        const content = await loadMockCode(path, method, 'script')
+        const { raw = '' } = content ? JSON.parse(content) : {}
         saved = !!raw
         code = formatCode(raw || createScriptParser(swagger)(path, method))
       } else {
