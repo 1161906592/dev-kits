@@ -196,10 +196,10 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
             if (options.rewrite) {
               const originUrl = req.url || ''
               req.url = options.rewrite(originUrl, address.slice(0, -'/v2/api-docs'.length))
-              req.url !== originUrl && logger('Websocket', originUrl, req.url)
+              req.url !== originUrl && logger('Websocket rewrite', originUrl, req.url)
             }
 
-            logger('Websocket', req.url || '', opts[context])
+            logger('Websocket proxy', req.url || '', opts[context])
             proxy.ws(req, socket, head, { target: opts[context], ...options })
           }
 
@@ -229,7 +229,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
       if (options.rewrite) {
         const originUrl = req.url || ''
         req.url = options.rewrite(originUrl, address.slice(0, -'/v2/api-docs'.length))
-        req.url !== originUrl && logger('Rewrite', originUrl, req.url)
+        req.url !== originUrl && logger('Proxy rewrite', originUrl, req.url)
       }
 
       const opts = { target: new URL(address).origin, ...proxy }

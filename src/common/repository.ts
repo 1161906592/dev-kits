@@ -3,12 +3,12 @@ import { dataDir } from '../constants'
 
 export async function saveMockCode(path: string, method: string, type: string, code: string) {
   if (!code) return
-  const filename = `${path}-${method}-${type}`.slice(1).replace(/[/?<>:"*|]/g, '+')
+  const filename = `${path}-${method}-${type}`.replace(/[/?<>:"*|]/g, '+')
   await promises.writeFile(`${dataDir}/${filename}.txt`, code, 'utf8')
 }
 
 export async function removeMockCode(path: string, method: string, type: string) {
-  const filename = `${path}-${method}-${type}`.slice(1).replace(/[/?<>:"*|]/g, '+')
+  const filename = `${path}-${method}-${type}`.replace(/[/?<>:"*|]/g, '+')
 
   try {
     await promises.unlink(`${dataDir}/${filename}.txt`)
@@ -18,7 +18,7 @@ export async function removeMockCode(path: string, method: string, type: string)
 }
 
 export async function loadMockCode(path: string, method: string, type: string) {
-  const filename = `${path}-${method}-${type}`.slice(1).replace(/[/?<>:"*|]/g, '+')
+  const filename = `${path}-${method}-${type}`.replace(/[/?<>:"*|]/g, '+')
 
   try {
     return await promises.readFile(`${dataDir}/${filename}.txt`, 'utf8')

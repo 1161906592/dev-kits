@@ -1,20 +1,22 @@
 import http from 'http'
 import chokidar from 'chokidar'
+import fs from 'fs-extra'
 import Koa from 'koa'
 import koaBody from 'koa-body'
 import cors from 'koa2-cors'
 import colors from 'picocolors'
 import { parseConfig } from './common/config'
 import { pathMock } from './common/pathMock'
-import { defaultConfigFile } from './constants'
+import { dataDir, defaultConfigFile } from './constants'
 import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
 import swaggerMiddleware from './middlewares/swagger'
 import router from './routes/routes'
 
-parseConfig()
 pathMock()
+fs.ensureDir(dataDir)
 
+parseConfig()
 const watcher = chokidar.watch(`${process.cwd()}/${defaultConfigFile}`)
 
 watcher.on('change', async () => {
