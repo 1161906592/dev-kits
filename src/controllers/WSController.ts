@@ -9,17 +9,21 @@ class WSController {
     try {
       ctx.body = {
         status: true,
-        data: await Promise.all(
-          records.map(async (path) => {
-            const { raw, interval } = JSON.parse(await loadMockCode(path, 'ws', 'ws'))
+        data: (
+          await Promise.all(
+            records.map(async (path) => {
+              const content = await loadMockCode(path, 'ws', 'ws')
+              if (!content) return
+              const { raw, interval } = JSON.parse(content)
 
-            return {
-              path,
-              code: raw,
-              interval: String(interval),
-            }
-          })
-        ),
+              return {
+                path,
+                code: raw,
+                interval: String(interval),
+              }
+            })
+          )
+        ).filter(Boolean),
       }
     } catch (e) {
       console.error(e)
