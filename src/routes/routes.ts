@@ -1,7 +1,7 @@
-import KoaRouter from 'koa-router'
-import api from '../controllers/ApiController'
-import mock from '../controllers/MockController'
-import ws from '../controllers/WSController'
+import KoaRouter from '@koa/router'
+import api from '../controller/ApiController'
+import mock from '../controller/MockController'
+import ws from '../controller/WSController'
 
 const router = new KoaRouter({ prefix: '/__swagger__' })
 
