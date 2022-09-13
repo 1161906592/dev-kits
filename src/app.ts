@@ -10,6 +10,7 @@ import { pathMock } from './common/pathMock'
 import { dataDir, defaultConfigFile } from './constants'
 import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
+import responseMiddleware from './middlewares/response'
 import swaggerMiddleware from './middlewares/swagger'
 import router from './routes/routes'
 
@@ -31,6 +32,7 @@ app.use(cors())
 app.use(swaggerMiddleware())
 app.use(mockMiddleware())
 app.use(koaBody())
+app.use(responseMiddleware())
 app.use(router.routes())
 
 server.listen('7788', () => {

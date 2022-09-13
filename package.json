@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "esno src/app.ts",
     "build": "tsc",
-    "start": "node lib/app.js"
+    "start": "node lib/app.js",
+    "init": "esno src/init.ts"
   },
   "bin": {
     "swagger-codegen": "bin/index.js"
@@ -34,7 +35,7 @@
     "url": "https://github.com/1161906592/swagger-codegen/issues"
   },
   "devDependencies": {
-    "@celi/eslint-config": "^0.1.0",
+    "@liuyang0826/eslint-config": "^0.0.1",
     "@types/ejs": "^3.1.1",
     "@types/fs-extra": "^9.0.13",
     "@types/http-proxy": "^1.17.9",
@@ -65,8 +66,10 @@
     "koa": "^2.13.4",
     "koa-body": "^5.0.0",
     "mockjs": "^1.1.0",
+    "mysql2": "^2.3.3",
     "picocolors": "^1.0.0",
     "prettier": "^2.7.1",
+    "sequelize": "^6.21.6",
     "vm2": "^3.9.11",
     "ws": "^8.8.1"
   }
