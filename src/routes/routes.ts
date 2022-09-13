@@ -5,6 +5,7 @@ import ws from '../controller/WSController'
 
 const router = new KoaRouter({ prefix: '/__swagger__' })
 
+router.get('/api/resources', api.resources)
 router.get('/api/swagger', api.swagger)
 router.get('/api/config', api.config)
 router.get('/api/apiCode', api.apiCode)

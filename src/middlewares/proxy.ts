@@ -19,6 +19,8 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
     address = _address
   }
 
+  const getAddress = () => address
+
   const proxy = httpProxy.createProxyServer({
     changeOrigin: true,
   })
@@ -214,6 +216,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
   return async (ctx, next) => {
     const { req, res, path } = ctx
     ctx.state.setAddress = setAddress
+    ctx.state.getAddress = getAddress
     ctx.state.startPush = startPush
     ctx.state.stopPush = stopPush
 

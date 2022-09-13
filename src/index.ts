@@ -1,5 +1,5 @@
 import Server, { ServerOptions } from 'http-proxy'
-import { Property, Swagger } from './types'
+import { Property } from './types'
 
 export interface Codegen {
   label: string
@@ -39,7 +39,7 @@ export interface MockOpions {
 export interface IConfig {
   apiTemplate: string
   codegen?: Codegen[]
-  patchPath?(path: string, data: Swagger): string
+  patchPath?(path: string, address: string): string
   filePath?(path: string): string
   address?: Address[]
   proxy?: ProxyOptions

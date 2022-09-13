@@ -1,13 +1,34 @@
+import parser from '@liuyang0826/openapi-parser'
+import axios from 'axios'
 import { render } from 'ejs'
 import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
 import colors from 'picocolors'
-import { createCodeParser } from '../common/codePaser'
 import { config } from '../common/config'
 import { findCodegen, formatCode } from '../common/utils'
 
 class ApiController {
+  async resources(ctx: ParameterizedContext) {
+    const url = ctx.query.url as string
+
+    console.log(`${colors.bold('Pull swagger resources')}:  ${colors.green(url)}`)
+
+    try {
+      ctx.body = {
+        status: true,
+        data: (await axios(url)).data,
+      }
+    } catch (e) {
+      console.error(e)
+
+      ctx.body = {
+        status: false,
+        message: '文档加载失败',
+      }
+    }
+  }
+
   async swagger(ctx: ParameterizedContext) {
     const url = ctx.query.url as string
 
@@ -35,12 +56,22 @@ class ApiController {
     try {
       const swagger = (await ctx.state.loadSwagger()).swagger
       if (!swagger) throw ''
+      const { apiTemplate = '', patchPath } = config || {}
 
-      const codeParser = createCodeParser(swagger, config)
+      const program = parser(swagger, path, method)
+
+      const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
+
+      const realPath = (
+        program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
+      ).replace(/\/+/g, '/')
 
       ctx.body = {
         status: true,
-        data: codeParser(path, method),
+        data: {
+          tsCode: program ? formatCode(render(apiTemplate, { path: realPath, method, ...program })) : '',
+          jsCode: program ? formatCode(render(apiTemplate, { path: realPath, method, ...program })) : '',
+        },
       }
     } catch (e) {
       console.error(e)
@@ -60,18 +91,25 @@ class ApiController {
     try {
       const swagger = (await ctx.state.loadSwagger()).swagger
       if (!swagger) throw ''
-      const codeParser = createCodeParser(swagger, config)
+      const { apiTemplate = '', patchPath } = config || {}
 
       const result = await Promise.all(
         (body as { path: string; method: string }[]).map(async (item) => {
           const curPath = swagger.paths[item.path as string]
           if (!curPath) return
-          const { tsCode } = codeParser(item.path, item.method) || {}
+          const program = parser(swagger, item.path, item.method)
+          if (!program) return
+
+          const fullPath = patchPath ? patchPath(item.path, ctx.state.getAddress()) : item.path
+
+          const realPath = (
+            program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
+          ).replace(/\/+/g, '/')
+
+          const tsCode = formatCode(render(apiTemplate, { path: realPath, method: item.method, ...program }))
           if (!tsCode) return
 
-          const realPath = config?.patchPath ? config.patchPath(item.path, swagger) : `${swagger.basePath}/${item.path}`
-
-          const filePath = `${process.cwd()}/src${`${(config?.filePath ? config.filePath(realPath) : realPath).replace(
+          const filePath = `${process.cwd()}/src${`${(config?.filePath ? config.filePath(fullPath) : fullPath).replace(
             /\//g,
             '/'
           )}${Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''}.ts`}`

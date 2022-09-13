@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { Middleware } from 'koa'
-import { Swagger } from 'src/types'
 import { config } from '../common/config'
+import { Swagger } from '../types'
 
 export default function swaggerMiddleware(): Middleware {
   let swaggerJSON: Promise<{ swagger: Swagger; pathMap: Record<string, string | undefined> } | null> =
@@ -16,7 +16,7 @@ export default function swaggerMiddleware(): Middleware {
 
         if (res.data) {
           Object.keys(res.data.paths).forEach((path) => {
-            pathMap[(patchPath?.(path, res.data) || path).replace(/\/+/g, '/')] = path
+            pathMap[(patchPath?.(path, url) || path).replace(/\/+/g, '/')] = path
           })
         }
 
