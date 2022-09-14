@@ -12,10 +12,10 @@ export interface Codegen {
   transform?(
     input: string,
     options: string[]
-  ): {
+  ): Promise<{
     template: string
     data?: Record<string, unknown>
-  }
+  }>
 }
 
 export interface Address {
@@ -37,7 +37,8 @@ export interface MockOptions {
 }
 
 export interface IConfig {
-  apiTemplate: string
+  tsApi(): Promise<string>
+  jsApi(): Promise<string>
   codegen?: Codegen[]
   patchPath?(path: string, address: string): string
   filePath?(path: string): string

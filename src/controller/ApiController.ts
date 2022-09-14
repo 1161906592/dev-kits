@@ -31,7 +31,7 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { apiTemplate = '', patchPath } = config || {}
+    const { tsApi, jsApi, patchPath } = config || {}
 
     const program = parser(swagger, path, method)
 
@@ -42,8 +42,8 @@ class ApiController {
     ).replace(/\/+/g, '/')
 
     ctx.ok({
-      tsCode: program ? formatCode(render(apiTemplate, { path: realPath, method, ...program })) : '',
-      jsCode: program ? formatCode(render(apiTemplate, { path: realPath, method, ...program })) : '',
+      tsCode: program && tsApi ? formatCode(render(await tsApi(), { path: realPath, method, ...program })) : '',
+      jsCode: program && jsApi ? formatCode(render(await jsApi(), { path: realPath, method, ...program })) : '',
     })
   }
 
@@ -54,7 +54,7 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { apiTemplate = '', patchPath } = config || {}
+    const { tsApi, patchPath } = config || {}
 
     const result = await Promise.all(
       (body as { path: string; method: string }[]).map(async (item) => {
@@ -69,7 +69,7 @@ class ApiController {
           program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
         ).replace(/\/+/g, '/')
 
-        const tsCode = formatCode(render(apiTemplate, { path: realPath, method: item.method, ...program }))
+        const tsCode = tsApi && formatCode(render(await tsApi(), { path: realPath, method: item.method, ...program }))
         if (!tsCode) return
 
         const filePath = `${process.cwd()}/src${`${(config?.filePath ? config.filePath(fullPath) : fullPath).replace(
@@ -142,7 +142,7 @@ class ApiController {
     const key = ctx.request.body.key
     const codegen = findCodegen(config?.codegen || [], key)
 
-    const { template, data } = codegen?.transform?.(ctx.request.body.input, ctx.request.body.options) || {}
+    const { template, data } = (await codegen?.transform?.(ctx.request.body.input, ctx.request.body.options)) || {}
 
     ctx.ok(template ? formatCode(render(template, data)) : '')
   }
