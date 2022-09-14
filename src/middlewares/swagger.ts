@@ -1,15 +1,15 @@
+import { SwaggerV2, SwaggerV3 } from '@liuyang0826/openapi-parser'
 import axios from 'axios'
 import { Middleware } from 'koa'
 import { config } from '../common/config'
-import { Swagger } from '../types'
 
 export default function swaggerMiddleware(): Middleware {
-  let swaggerJSON: Promise<{ swagger: Swagger; pathMap: Record<string, string | undefined> } | null> =
+  let swaggerJSON: Promise<{ swagger: SwaggerV2 | SwaggerV3; pathMap: Record<string, string | undefined> } | null> =
     Promise.resolve(null)
 
   const loadSwagger = (url?: string) => {
     if (url) {
-      swaggerJSON = axios.get<Swagger>(url).then((res) => {
+      swaggerJSON = axios.get<SwaggerV2 | SwaggerV3>(url).then((res) => {
         const patchPath = config?.patchPath
 
         const pathMap: Record<string, string | undefined> = {}

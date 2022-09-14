@@ -1,7 +1,7 @@
 import { Middleware } from 'koa'
 import { mock } from 'mockjs'
 import colors from 'picocolors'
-import { createMockParser, createScriptParser } from '../common/mockPaser'
+import { mockParser, scriptParser } from '../common/mockPaser'
 import { loadMockCode } from '../common/repository'
 import { runScriptInSandbox, sleep } from '../common/utils'
 
@@ -25,17 +25,17 @@ export default function mockMiddleware(): Middleware {
 
       if (mockType === 'json') {
         const mockJSON = mockCode ? mock(mockCode) : await loadMockCode(path, method, 'json')
-        ctx.body = mockJSON || mock(createMockParser(swagger)(path, method))
+        ctx.body = mockJSON || mock(mockParser(swagger, path, method))
       } else if (mockType === 'script') {
         const content = await loadMockCode(path, method, 'script')
         const { code = '' } = content ? JSON.parse(content) : {}
 
-        ctx.body = await runScriptInSandbox(code || createScriptParser(swagger)(path, method))({
+        ctx.body = await runScriptInSandbox(code || scriptParser(swagger, path, method))({
           Mockjs: require('mockjs'),
           dayjs: require('dayjs'),
         })
       } else {
-        ctx.body = mock(mockCode ? JSON.parse(mockCode) : createMockParser(swagger)(path, method))
+        ctx.body = mock(mockCode ? JSON.parse(mockCode) : mockParser(swagger, path, method))
       }
 
       ctx.type = 'json'

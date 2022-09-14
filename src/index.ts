@@ -1,5 +1,5 @@
+import { Property } from '@liuyang0826/openapi-parser'
 import Server, { ServerOptions } from 'http-proxy'
-import { Property } from './types'
 
 export interface Codegen {
   label: string
@@ -31,7 +31,7 @@ export interface ProxyOptions extends ServerOptions {
   websocket?: Record<string, string>
 }
 
-export interface MockOpions {
+export interface MockOptions {
   listCount?: `${number}-${number}` | number
   template?(name: string, property: Property, deep: number): unknown
 }
@@ -43,7 +43,7 @@ export interface IConfig {
   filePath?(path: string): string
   address?: Address[]
   proxy?: ProxyOptions
-  mock?: MockOpions
+  mock?: MockOptions
 }
 
 export function defineConfig(config: IConfig) {

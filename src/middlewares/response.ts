@@ -16,6 +16,11 @@ export default function responseMiddleware(): Middleware {
       }
     }
 
-    await next()
+    try {
+      await next()
+    } catch (e: any) {
+      console.log(e)
+      ctx.fail(e.message)
+    }
   }
 }

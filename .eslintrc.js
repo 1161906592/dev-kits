@@ -1,6 +1,5 @@
 module.exports = {
-  root: true,
-  extends: ['@celi'],
+  extends: '@liuyang0826',
   rules: {
     '@typescript-eslint/no-var-requires': 0,
   },
