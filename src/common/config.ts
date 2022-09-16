@@ -4,6 +4,10 @@ import { defaultConfigFile } from '../constants'
 
 export let config: IConfig | undefined
 
+export function getConfig() {
+  return config
+}
+
 export function parseConfig() {
   try {
     config = jiti(process.cwd(), {

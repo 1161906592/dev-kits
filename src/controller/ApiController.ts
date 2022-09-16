@@ -28,11 +28,11 @@ class ApiController {
   async apiCode(ctx: ParameterizedContext) {
     const path = ctx.query.path as string
     const method = ctx.query.method as string
+    const lang = ctx.query.lang as string
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
     const { tsApi, jsApi, patchPath } = config || {}
-
     const program = parser(swagger, path, method)
 
     const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
@@ -41,10 +41,16 @@ class ApiController {
       program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
     ).replace(/\/+/g, '/')
 
-    ctx.ok({
-      tsCode: program && tsApi ? formatCode(render(await tsApi(), { path: realPath, method, ...program })) : '',
-      jsCode: program && jsApi ? formatCode(render(await jsApi(), { path: realPath, method, ...program })) : '',
-    })
+    let result = ''
+    const data = { path: realPath, method, ...program }
+
+    if (lang === 'javascript') {
+      result = program && jsApi ? render(await jsApi(), data) : ''
+    } else {
+      result = program && tsApi ? render(await tsApi(), data) : ''
+    }
+
+    ctx.ok(formatCode(result))
   }
 
   async syncCode(ctx: ParameterizedContext) {
