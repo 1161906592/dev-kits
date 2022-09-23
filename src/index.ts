@@ -4,6 +4,7 @@ import Server, { ServerOptions } from 'http-proxy'
 export interface Codegen {
   label: string
   key: string
+  docs?: string
   children?: Codegen[]
   options?: {
     label: string

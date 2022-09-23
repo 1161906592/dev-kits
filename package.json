@@ -7,8 +7,7 @@
   "scripts": {
     "dev": "esno src/app.ts",
     "build": "tsc",
-    "start": "node lib/app.js",
-    "init": "esno src/init.ts"
+    "start": "node lib/app.js"
   },
   "bin": {
     "swagger-codegen": "bin/index.js"
@@ -53,7 +52,7 @@
   "dependencies": {
     "@koa/cors": "^3.4.1",
     "@koa/router": "^12.0.0",
-    "@liuyang0826/openapi-parser": "^0.0.1",
+    "@liuyang0826/openapi-parser": "^0.0.5",
     "axios": "^0.27.2",
     "chokidar": "^3.5.3",
     "dayjs": "^1.11.5",

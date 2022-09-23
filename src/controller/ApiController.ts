@@ -20,7 +20,7 @@ class ApiController {
   async swagger(ctx: ParameterizedContext) {
     const url = ctx.query.url as string
 
-    console.log(`${colors.bold('Pull swagger')}:  ${colors.green(url)}`)
+    console.log(`${colors.bold('Pull swagger data')}:  ${colors.green(url)}`)
 
     ctx.ok((await ctx.state.loadSwagger(url)).swagger)
   }
