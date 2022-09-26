@@ -1,5 +1,5 @@
 import { Property } from '@liuyang0826/openapi-parser'
-import Server, { ServerOptions } from 'http-proxy'
+import { HttpProxy } from '../dep-types/http-proxy'
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -27,9 +27,9 @@ export interface Address {
   children?: Address[]
 }
 
-export interface ProxyOptions extends ServerOptions {
+export interface ProxyOptions extends HttpProxy.ServerOptions {
   rewrite?: (path: string, address: string) => string
-  configure?: (proxy: Server, options: ProxyOptions) => void
+  configure?: (proxy: HttpProxy.Server, options: ProxyOptions) => void
   isPass?: (path: string, address: string) => unknown
   websocket?: Record<string, string>
 }
@@ -57,3 +57,5 @@ export interface IConfig {
 export function defineConfig(config: IConfig) {
   return config
 }
+
+export { Property, HttpProxy }

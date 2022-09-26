@@ -235,8 +235,8 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
         req.url !== originUrl && logger('Proxy rewrite', originUrl, req.url)
       }
 
-      const opts = { target: new URL(address).origin, ...proxy }
-      logger('Proxy', req.url || '', opts.target)
+      const opts = { target: new URL(address).origin, ...options }
+      logger('Proxy', req.url || '', opts.target.toString())
 
       return await new Promise<void>((resolve) => proxy.web(req, res, opts, () => resolve()))
     }

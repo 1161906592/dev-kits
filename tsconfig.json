@@ -13,5 +13,5 @@
     "resolveJsonModule": true,
     "outDir": "lib",
   },
-  "include": ["src"]
+  "include": ["src", "dep-types"]
 }
