@@ -1,7 +1,7 @@
 {
   "name": "@liuyang0826/dev-kits",
   "version": "0.0.1",
-  "description": "接口文档工具",
+  "description": "codegen powered by openapi, support local proxy and data mock",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
