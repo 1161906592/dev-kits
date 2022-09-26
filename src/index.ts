@@ -1,6 +1,8 @@
 import { Property } from '@liuyang0826/openapi-parser'
 import Server, { ServerOptions } from 'http-proxy'
 
+type MaybePromise<T> = T | Promise<T>
+
 export interface Codegen {
   label: string
   key: string
@@ -13,7 +15,7 @@ export interface Codegen {
   transform?(
     input: string,
     options: string[]
-  ): Promise<{
+  ): MaybePromise<{
     template: string
     data?: Record<string, unknown>
   }>
@@ -37,15 +39,19 @@ export interface MockOptions {
   template?(name: string, property: Property, deep: number): unknown
 }
 
+export interface Language {
+  type: string
+  template(): MaybePromise<string>
+}
+
 export interface IConfig {
-  tsApi(): Promise<string>
-  jsApi(): Promise<string>
   codegen?: Codegen[]
   patchPath?(path: string, address: string): string
   filePath?(path: string): string
   address?: Address[]
   proxy?: ProxyOptions
   mock?: MockOptions
+  languages: Language[]
 }
 
 export function defineConfig(config: IConfig) {

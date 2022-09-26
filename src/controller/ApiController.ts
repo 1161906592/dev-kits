@@ -32,25 +32,27 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { tsApi, jsApi, patchPath } = config || {}
+    const { languages, patchPath } = config || {}
     const program = parser(swagger, path, method)
-
     const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
 
     const realPath = (
       program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
     ).replace(/\/+/g, '/')
 
-    let result = ''
-    const data = { path: realPath, method, ...program }
+    let code = ''
+    const template = program && languages?.find((d) => d.type === lang)?.template
+    code = template ? render(await template(), { path: realPath, method, ...program }) : ''
 
-    if (lang === 'javascript') {
-      result = program && jsApi ? render(await jsApi(), data) : ''
-    } else {
-      result = program && tsApi ? render(await tsApi(), data) : ''
+    if (code) {
+      try {
+        code = formatCode(code)
+      } catch (e) {
+        console.log(e)
+      }
     }
 
-    ctx.ok(formatCode(result))
+    ctx.ok(code)
   }
 
   async syncCode(ctx: ParameterizedContext) {
@@ -60,28 +62,37 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { tsApi, patchPath } = config || {}
+    const { languages, patchPath } = config || {}
 
     const result = await Promise.all(
-      (body as { path: string; method: string }[]).map(async (item) => {
-        const curPath = swagger.paths[item.path as string]
+      (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
+        const curPath = swagger.paths[path]
         if (!curPath) return
-        const program = parser(swagger, item.path, item.method)
+        const program = parser(swagger, path, method)
         if (!program) return
 
-        const fullPath = patchPath ? patchPath(item.path, ctx.state.getAddress()) : item.path
+        const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
 
         const realPath = (
           program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
         ).replace(/\/+/g, '/')
 
-        const tsCode = tsApi && formatCode(render(await tsApi(), { path: realPath, method: item.method, ...program }))
-        if (!tsCode) return
+        let result = ''
+        const template = program && languages?.find((d) => d.type === lang)?.template
+        result = template ? render(await template(), { path: realPath, method, ...program }) : ''
 
-        const filePath = `${process.cwd()}/src${`${(config?.filePath ? config.filePath(fullPath) : fullPath).replace(
-          /\//g,
-          '/'
-        )}${Object.keys(curPath).length > 1 ? `-${(item.method as string).toLocaleLowerCase()}` : ''}.ts`}`
+        if (result) {
+          try {
+            result = formatCode(result)
+          } catch (e) {
+            console.log(e)
+          }
+        }
+
+        const filePath = `${`${(config?.filePath
+          ? config.filePath(fullPath)
+          : `${process.cwd()}/src${fullPath}`
+        ).replace(/\//g, '/')}${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.ts`}`
 
         // 检测是否禁止覆盖
         const isExists = await fs.pathExists(filePath)
@@ -93,19 +104,21 @@ class ApiController {
             return {
               status: 'disabled',
               filePath,
-              ...item,
+              method,
+              path,
             }
           }
         } else {
           await fs.ensureFile(filePath)
         }
 
-        await fs.writeFile(filePath, tsCode, 'utf-8')
+        await fs.writeFile(filePath, result, 'utf-8')
 
         return {
           status: 'ok',
           filePath,
-          ...item,
+          method,
+          path,
         }
       })
     )
@@ -136,11 +149,12 @@ class ApiController {
   }
 
   async config(ctx: ParameterizedContext) {
-    const { codegen = [], address = [] } = config || {}
+    const { codegen = [], address = [], languages = [] } = config || {}
 
     ctx.ok({
       codegen,
       address,
+      languages: languages.map((d) => d.type),
     })
   }
 

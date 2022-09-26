@@ -35,6 +35,8 @@ app.use(koaBody())
 app.use(responseMiddleware())
 app.use(router.routes())
 
-server.listen('7788', () => {
-  console.log(`${colors.green('➜')} ${colors.bold(` Swagger server ready`)}:  ${colors.cyan(`http://127.0.0.1:7788/`)}`)
+server.listen(51965, '0.0.0.0', () => {
+  console.log(
+    `${colors.green('➜')} ${colors.bold(` Swagger server ready`)}:  ${colors.cyan(`http://127.0.0.1:51965/`)}`
+  )
 })

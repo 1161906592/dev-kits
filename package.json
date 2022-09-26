@@ -1,20 +1,21 @@
 {
-  "name": "@celi/swagger-codegen",
-  "version": "0.7.0",
+  "name": "@liuyang0826/dev-kits",
+  "version": "0.0.1",
   "description": "接口文档工具",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
     "dev": "esno src/app.ts",
     "build": "tsc",
-    "start": "node lib/app.js"
+    "start": "node lib/app.js",
+    "release": "bumpp && tsc && npm publish --access public"
   },
   "bin": {
-    "swagger-codegen": "bin/index.js"
+    "dev-kits": "bin/index.js"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/1161906592/swagger-codegen.git"
+    "url": "git+https://github.com/1161906592/dev-kits.git"
   },
   "files": [
     "bin",
@@ -31,7 +32,7 @@
   "author": "liuyang.0826<1161906592@qq.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/1161906592/swagger-codegen/issues"
+    "url": "https://github.com/1161906592/dev-kits/issues"
   },
   "devDependencies": {
     "@liuyang0826/eslint-config": "^0.0.1",
@@ -45,6 +46,7 @@
     "@types/node": "^18.7.13",
     "@types/prettier": "^2.7.0",
     "@types/ws": "^8.5.3",
+    "bumpp": "^8.2.1",
     "eslint": "^8.22.0",
     "esno": "^0.16.3",
     "typescript": "^4.8.2"

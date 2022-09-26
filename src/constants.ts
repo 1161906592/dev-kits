@@ -1,4 +1,4 @@
-export const configFile = 'swagger.config'
+export const configFile = 'dev-kits.config'
 
 export const extensions = ['ts', 'mts', 'cts', 'js', 'mjs', 'cjs']
 
