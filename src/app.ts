@@ -7,7 +7,7 @@ import koaBody from 'koa-body'
 import colors from 'picocolors'
 import { parseConfig } from './common/config'
 import { pathMock } from './common/pathMock'
-import { dataDir, defaultConfigFile } from './constants'
+import { dataDir, configFile, extensions } from './constants'
 import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
 import responseMiddleware from './middlewares/response'
@@ -18,7 +18,7 @@ pathMock()
 fs.ensureDir(dataDir)
 
 parseConfig()
-const watcher = chokidar.watch(`${process.cwd()}/${defaultConfigFile}`)
+const watcher = chokidar.watch(`./${configFile}.{${extensions.join(',')}}`)
 
 watcher.on('change', async () => {
   parseConfig()

@@ -1,6 +1,0 @@
-// 表单校验规则
-const rules: FormRules = {
-  <% fields.filter((item) => item.key !== 'id' && item.required).forEach(function(item){ %>
-    <%- item.key %>: <%- include( `${process.cwd()}/.swagger/formRuleItem.ejs`, { item }) %>,
-  <% }); %>
-}

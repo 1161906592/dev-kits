@@ -1,9 +1,0 @@
-<% if (typeof isSingle !== 'undefined') { %>
-const data = {
-<% } %>
-<% fields.forEach(function(item){ %>
-  <%- item.key %>: null, // <%- item.title %>
-<% }) %>
-<% if (typeof isSingle !== 'undefined') { %>
-}
-<% } %>

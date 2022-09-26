@@ -1,8 +1,0 @@
-{
-  "scripts": {
-    "swagger:start": "swagger-codegen"
-  },
-  "dependencies": {
-    "@celi/swagger-codegen": "^0.4.3"
-  }
-}

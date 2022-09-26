@@ -1,6 +1,6 @@
-import jiti from 'jiti'
+import { loadConfig } from 'unconfig'
 import { IConfig } from '..'
-import { defaultConfigFile } from '../constants'
+import { configFile, extensions } from '../constants'
 
 export let config: IConfig | undefined
 
@@ -8,18 +8,18 @@ export function getConfig() {
   return config
 }
 
-export function parseConfig() {
-  try {
-    config = jiti(process.cwd(), {
-      cache: false,
-      requireCache: false,
-      v8cache: false,
-      interopDefault: true,
-      esmResolve: true,
-    })(`./${defaultConfigFile}`)
-  } catch (err: any) {
-    if (err.code !== 'MODULE_NOT_FOUND') {
-      console.error(`Error trying import ${defaultConfigFile} from ${process.cwd()}`, err)
-    }
-  }
+export async function parseConfig() {
+  const result = await loadConfig<IConfig>({
+    sources: [
+      {
+        files: configFile,
+        extensions: extensions,
+      },
+    ],
+    merge: false,
+  })
+
+  console.log(result)
+
+  config = result.config
 }
