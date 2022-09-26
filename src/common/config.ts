@@ -19,7 +19,5 @@ export async function parseConfig() {
     merge: false,
   })
 
-  console.log(result)
-
   config = result.config
 }
