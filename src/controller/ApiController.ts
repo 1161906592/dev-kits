@@ -63,6 +63,7 @@ class ApiController {
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
     const { languages, patchPath } = config || {}
+    if (!languages) throw 'not languages'
 
     const result = await Promise.all(
       (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
@@ -74,11 +75,14 @@ class ApiController {
         const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
 
         const realPath = (
-          program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
+          program.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
         ).replace(/\/+/g, '/')
 
+        const language = languages.find((d) => d.type === lang)
+        if (!language) return
+
+        const { template, extension } = language
         let result = ''
-        const template = program && languages?.find((d) => d.type === lang)?.template
         result = template ? render(await template(), { path: realPath, method, ...program }) : ''
 
         if (result) {
@@ -92,7 +96,7 @@ class ApiController {
         const filePath = `${`${(config?.filePath
           ? config.filePath(fullPath)
           : `${process.cwd()}/src${fullPath}`
-        ).replace(/\//g, '/')}${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.ts`}`
+        ).replace(/\//g, '/')}${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.${extension}`}`
 
         // 检测是否禁止覆盖
         const isExists = await fs.pathExists(filePath)

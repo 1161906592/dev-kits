@@ -41,6 +41,7 @@ export interface MockOptions {
 
 export interface Language {
   type: string
+  extension: string
   template(): MaybePromise<string>
 }
 
