@@ -1,7 +1,7 @@
 import { Property } from '@liuyang0826/openapi-parser'
-import { HttpProxy } from '../dep-types/http-proxy'
+import * as HttpProxy from 'http-proxy'
 
-type MaybePromise<T> = T | Promise<T>
+export type MaybePromise<T> = T | Promise<T>
 
 export interface Codegen {
   label: string
@@ -29,7 +29,7 @@ export interface Address {
 
 export interface ProxyOptions extends HttpProxy.ServerOptions {
   rewrite?: (path: string, address: string) => string
-  configure?: (proxy: HttpProxy.Server, options: ProxyOptions) => void
+  configure?: (proxy: HttpProxy, options: ProxyOptions) => void
   isPass?: (path: string, address: string) => unknown
   websocket?: Record<string, string>
 }
@@ -58,4 +58,4 @@ export function defineConfig(config: IConfig) {
   return config
 }
 
-export { Property, HttpProxy }
+export type { Property, HttpProxy }
