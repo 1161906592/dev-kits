@@ -37,7 +37,5 @@ app.use(router.routes())
 
 // fixed port
 server.listen(51965, () => {
-  console.log(
-    `${colors.green('➜')} ${colors.bold(` Swagger server ready`)}:  ${colors.cyan(`http://127.0.0.1:51965/`)}`
-  )
+  console.log(`${colors.green('➜')} ${colors.bold(` Dev-kits ready`)}:  ${colors.cyan(`http://127.0.0.1:51965/`)}`)
 })
