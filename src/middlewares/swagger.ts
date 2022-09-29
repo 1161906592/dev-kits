@@ -4,12 +4,12 @@ import { Middleware } from 'koa'
 import { config } from '../common/config'
 
 export default function swaggerMiddleware(): Middleware {
-  let swaggerJSON: Promise<{ swagger: SwaggerV2 | SwaggerV3; pathMap: Record<string, string | undefined> } | null> =
+  let swaggerData: Promise<{ swagger: SwaggerV2 | SwaggerV3; pathMap: Record<string, string | undefined> } | null> =
     Promise.resolve(null)
 
   const loadSwagger = (url?: string) => {
     if (url) {
-      swaggerJSON = axios.get<SwaggerV2 | SwaggerV3>(url).then((res) => {
+      swaggerData = axios.get<SwaggerV2 | SwaggerV3>(url).then((res) => {
         const patchPath = config?.patchPath
 
         const pathMap: Record<string, string | undefined> = {}
@@ -27,7 +27,7 @@ export default function swaggerMiddleware(): Middleware {
       })
     }
 
-    return swaggerJSON
+    return swaggerData
   }
 
   return async (ctx, next) => {

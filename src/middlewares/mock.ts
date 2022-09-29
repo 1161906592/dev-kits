@@ -9,8 +9,8 @@ export default function mockMiddleware(): Middleware {
   return async (ctx, next) => {
     if (ctx.path.startsWith('/__swagger__')) return await next()
 
-    const { swagger, pathMap } = await ctx.state.loadSwagger()
-    if (!swagger) return await next()
+    const { swagger, pathMap } = (await ctx.state.loadSwagger()) || {}
+    if (!swagger || !pathMap) return await next()
 
     const path = pathMap[ctx.path]
     if (!path) return await next()
