@@ -224,24 +224,20 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
 
     const options = config?.proxy || {}
 
-    if (address) {
-      if (options.isPass && options.isPass(ctx.path || '', address)) {
-        return await next()
-      }
-
-      if (options.rewrite) {
-        const originUrl = req.url || ''
-        req.url = options.rewrite(originUrl, address.slice(0, -'/v2/api-docs'.length))
-        req.url !== originUrl && logger('Proxy rewrite', originUrl, req.url)
-      }
-
-      const opts = { target: new URL(address).origin, ...options }
-      logger('Proxy', req.url || '', opts.target.toString())
-
-      return await new Promise<void>((resolve) => proxy.web(req, res, opts, () => resolve()))
+    if (options.isPass && options.isPass(ctx.path || '', address)) {
+      return await next()
     }
 
-    await next()
+    if (options.rewrite) {
+      const originUrl = req.url || ''
+      req.url = options.rewrite(originUrl, address.slice(0, -'/v2/api-docs'.length))
+      req.url !== originUrl && logger('Proxy rewrite', originUrl, req.url)
+    }
+
+    const opts = { target: new URL(address).origin, ...options }
+    logger('Proxy', req.url || '', opts.target.toString())
+
+    return await new Promise<void>((resolve) => proxy.web(req, res, opts, () => resolve()))
   }
 }
 
