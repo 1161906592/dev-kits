@@ -12,13 +12,7 @@ export interface Codegen {
     label: string
     value: string
   }[]
-  transform?(
-    input: string,
-    options: string[]
-  ): MaybePromise<{
-    template: string
-    data?: Record<string, unknown>
-  }>
+  render?(input: string, options: string[]): MaybePromise<string>
 }
 
 export interface Address {
@@ -42,17 +36,17 @@ export interface MockOptions {
 export interface Language {
   type: string
   extension: string
-  template(): MaybePromise<string>
+  render(data: any): MaybePromise<string>
 }
 
 export interface IConfig {
-  codegen?: Codegen[]
+  codegen?: Codegen[] | (() => MaybePromise<Codegen[]>)
   patchPath?(path: string, address: string): string
   filePath?(path: string): string
   address?: Address[]
   proxy?: ProxyOptions
   mock?: MockOptions
-  languages: Language[]
+  languages: Language[] | (() => MaybePromise<Language[]>)
 }
 
 export function defineConfig(config: IConfig) {

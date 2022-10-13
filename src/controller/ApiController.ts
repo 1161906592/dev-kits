@@ -1,11 +1,11 @@
 import parser from '@liuyang0826/openapi-parser'
 import axios from 'axios'
-import { render } from 'ejs'
 import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
 import colors from 'picocolors'
-import { config } from '../common/config'
+import { Language } from 'src'
+import { config, resolveCodegen, resolveLanguages } from '../common/config'
 import { findCodegen, formatCode } from '../common/utils'
 
 class ApiController {
@@ -32,7 +32,7 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { languages, patchPath } = config || {}
+    const { patchPath } = config || {}
     const program = parser(swagger, path, method)
     const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
 
@@ -41,8 +41,8 @@ class ApiController {
     ).replace(/\/+/g, '/')
 
     let code = ''
-    const template = program && languages?.find((d) => d.type === lang)?.template
-    code = template ? render(await template(), { path: realPath, method, ...program }) : ''
+    const render = program && (await resolveLanguages())?.find((d) => d.type === lang)?.render
+    code = (await render?.({ path: realPath, method, ...program })) || ''
 
     if (code) {
       try {
@@ -62,8 +62,7 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { languages, patchPath } = config || {}
-    if (!languages) throw 'not languages'
+    const { patchPath } = config || {}
 
     const result = await Promise.all(
       (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
@@ -78,12 +77,12 @@ class ApiController {
           program.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
         ).replace(/\/+/g, '/')
 
-        const language = languages.find((d) => d.type === lang)
+        const language = (await resolveLanguages()).find((d) => d.type === lang)
         if (!language) return
 
-        const { template, extension } = language
+        const { render, extension } = language
         let result = ''
-        result = template ? render(await template(), { path: realPath, method, ...program }) : ''
+        result = (await render?.({ path: realPath, method, ...program })) || ''
 
         if (result) {
           try {
@@ -153,22 +152,30 @@ class ApiController {
   }
 
   async config(ctx: ParameterizedContext) {
-    const { codegen = [], address = [], languages = [] } = config || {}
+    const [codegen, languages] = (await Promise.allSettled([resolveCodegen(), resolveLanguages()])).map((d) =>
+      d.status === 'fulfilled' ? d.value : null
+    )
 
     ctx.ok({
       codegen,
-      address,
-      languages: languages.map((d) => d.type),
+      address: config?.address || [],
+      languages: (languages as Language[])?.map((d) => d.type) || [],
     })
   }
 
   async codegen(ctx: ParameterizedContext) {
-    const key = ctx.request.body.key
-    const codegen = findCodegen(config?.codegen || [], key)
+    const codegen = findCodegen(await resolveCodegen(), ctx.request.body.key)
+    let code = (await codegen?.render?.(ctx.request.body.input, ctx.request.body.options)) || ''
 
-    const { template, data } = (await codegen?.transform?.(ctx.request.body.input, ctx.request.body.options)) || {}
+    if (code) {
+      try {
+        code = formatCode(code)
+      } catch (e) {
+        console.log(e)
+      }
+    }
 
-    ctx.ok(template ? formatCode(render(template, data)) : '')
+    ctx.ok(code)
   }
 }
 

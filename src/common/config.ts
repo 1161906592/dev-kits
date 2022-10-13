@@ -21,3 +21,11 @@ export async function parseConfig() {
 
   config = result.config
 }
+
+export async function resolveCodegen() {
+  return (typeof config?.codegen === 'function' ? await config.codegen() : config?.codegen) || []
+}
+
+export async function resolveLanguages() {
+  return (typeof config?.languages === 'function' ? await config.languages() : config?.languages) || []
+}
