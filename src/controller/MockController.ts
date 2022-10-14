@@ -32,11 +32,6 @@ class MockController {
       code = mockCode || JSON.stringify(template, null, 2)
     }
 
-    ctx.body = {
-      status: true,
-      data: { saved, code },
-    }
-
     ctx.ok({ saved, code })
   }
 
