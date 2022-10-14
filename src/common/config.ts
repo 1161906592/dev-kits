@@ -1,6 +1,7 @@
 import { loadConfig } from 'unconfig'
-import { IConfig } from '..'
+import { Codegen, IConfig } from '..'
 import { configFile, extensions } from '../constants'
+import { findCodegen } from './utils'
 
 export let config: IConfig | undefined
 
@@ -22,8 +23,20 @@ export async function parseConfig() {
   config = result.config
 }
 
-export async function resolveCodegen() {
-  return (typeof config?.codegen === 'function' ? await config.codegen() : config?.codegen) || []
+export async function resolveCodegen(): Promise<Codegen[]>
+
+export async function resolveCodegen(id: string): Promise<Codegen>
+
+export async function resolveCodegen(id?: string) {
+  if (typeof config?.codegen === 'function') {
+    return await config.codegen(id)
+  }
+
+  if (id !== undefined) {
+    return findCodegen(config?.codegen || [], id)
+  }
+
+  return config?.codegen || []
 }
 
 export async function resolveLanguages() {

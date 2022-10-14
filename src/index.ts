@@ -40,7 +40,7 @@ export interface Language {
 }
 
 export interface IConfig {
-  codegen?: Codegen[] | (() => MaybePromise<Codegen[]>)
+  codegen?: Codegen[] | ((id?: string) => MaybePromise<Codegen | Codegen[]>)
   patchPath?(path: string, address: string): string
   filePath?(path: string): string
   address?: Address[]

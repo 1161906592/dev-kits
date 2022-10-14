@@ -6,7 +6,7 @@ import { ParameterizedContext } from 'koa'
 import colors from 'picocolors'
 import { Language } from 'src'
 import { config, resolveCodegen, resolveLanguages } from '../common/config'
-import { findCodegen, formatCode } from '../common/utils'
+import { formatCode } from '../common/utils'
 
 class ApiController {
   async resources(ctx: ParameterizedContext) {
@@ -164,7 +164,7 @@ class ApiController {
   }
 
   async codegen(ctx: ParameterizedContext) {
-    const codegen = findCodegen(await resolveCodegen(), ctx.request.body.key)
+    const codegen = await resolveCodegen(ctx.request.body.key as string)
     let code = (await codegen?.render?.(ctx.request.body.input, ctx.request.body.options)) || ''
 
     if (code) {
