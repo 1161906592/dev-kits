@@ -41,7 +41,7 @@ class ApiController {
     ).replace(/\/+/g, '/')
 
     let code = ''
-    const render = program && (await resolveLanguages())?.find((d) => d.type === lang)?.render
+    const render = program && (await resolveLanguages(lang))?.render
     code = (await render?.({ path: realPath, method, ...program })) || ''
 
     if (code) {
@@ -77,7 +77,8 @@ class ApiController {
           program.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
         ).replace(/\/+/g, '/')
 
-        const language = (await resolveLanguages()).find((d) => d.type === lang)
+        const language = await resolveLanguages(lang)
+
         if (!language) return
 
         const { render, extension } = language
@@ -165,7 +166,7 @@ class ApiController {
 
   async codegen(ctx: ParameterizedContext) {
     const codegen = await resolveCodegen(ctx.request.body.key as string)
-    let code = (await codegen?.render?.(ctx.request.body.input, ctx.request.body.options)) || ''
+    let code = (await codegen?.render?.(ctx.request.body.model, ctx.request.body.options)) || ''
 
     if (code) {
       try {
@@ -176,6 +177,17 @@ class ApiController {
     }
 
     ctx.ok(code)
+  }
+
+  async getFormFieldsByKey(ctx: ParameterizedContext) {
+    const key = ctx.query.key as string
+    const codegen = await resolveCodegen(key)
+
+    ctx.type = 'js'
+
+    ctx.body = `(function() {
+${((await codegen.formFields?.()) || '').replace(/\s*export default\s*([\w\W]+)/, `window["schema_jsonp_${key}"]($1)`)}
+})()`
   }
 }
 

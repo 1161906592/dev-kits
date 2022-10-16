@@ -6,13 +6,9 @@ export type MaybePromise<T> = T | Promise<T>
 export interface Codegen {
   label: string
   key: string
-  docs?: string
   children?: Codegen[]
-  options?: {
-    label: string
-    value: string
-  }[]
-  render?(input: string, options: string[]): MaybePromise<string>
+  render?(model: Record<string, unknown>, options: string[]): MaybePromise<string>
+  formFields?(): MaybePromise<string | void>
 }
 
 export interface Address {
@@ -46,7 +42,7 @@ export interface IConfig {
   address?: Address[]
   proxy?: ProxyOptions
   mock?: MockOptions
-  languages: Language[] | (() => MaybePromise<Language[]>)
+  languages: Language[] | ((id?: string) => MaybePromise<Language | Language[]>)
 }
 
 export function defineConfig(config: IConfig) {

@@ -1,5 +1,5 @@
 import { loadConfig } from 'unconfig'
-import { Codegen, IConfig } from '..'
+import { Codegen, IConfig, Language } from '..'
 import { configFile, extensions } from '../constants'
 import { findCodegen } from './utils'
 
@@ -39,6 +39,18 @@ export async function resolveCodegen(id?: string) {
   return config?.codegen || []
 }
 
-export async function resolveLanguages() {
-  return (typeof config?.languages === 'function' ? await config.languages() : config?.languages) || []
+export async function resolveLanguages(): Promise<Language[]>
+
+export async function resolveLanguages(type: string): Promise<Language>
+
+export async function resolveLanguages(type?: string) {
+  if (typeof config?.languages === 'function') {
+    return await config.languages(type)
+  }
+
+  if (type !== undefined) {
+    return (config?.languages || []).find((d) => d.type === type)
+  }
+
+  return config?.languages || []
 }
