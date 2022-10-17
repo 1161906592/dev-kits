@@ -1,7 +1,7 @@
 import { SwaggerV2, SwaggerV3 } from '@liuyang0826/openapi-parser'
 import axios from 'axios'
 import { Middleware } from 'koa'
-import { config } from '../common/config'
+import { getConfig } from '../common/config'
 
 export default function swaggerMiddleware(): Middleware {
   let swaggerData: Promise<{ swagger: SwaggerV2 | SwaggerV3; pathMap: Record<string, string | undefined> } | null> =
@@ -10,7 +10,7 @@ export default function swaggerMiddleware(): Middleware {
   const loadSwagger = (url?: string) => {
     if (url) {
       swaggerData = axios.get<SwaggerV2 | SwaggerV3>(url).then((res) => {
-        const patchPath = config?.patchPath
+        const patchPath = getConfig()?.patchPath
 
         const pathMap: Record<string, string | undefined> = {}
 

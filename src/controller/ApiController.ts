@@ -5,7 +5,7 @@ import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
 import colors from 'picocolors'
 import { Language } from 'src'
-import { config, resolveCodegen, resolveLanguages } from '../common/config'
+import { getConfig, resolveCodegen, resolveLanguages } from '../common/config'
 import { formatCode } from '../common/utils'
 
 class ApiController {
@@ -32,7 +32,7 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { patchPath } = config || {}
+    const { patchPath } = getConfig() || {}
     const program = parser(swagger, path, method)
     const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
 
@@ -62,7 +62,7 @@ class ApiController {
 
     const swagger = (await ctx.state.loadSwagger()).swagger
     if (!swagger) throw ''
-    const { patchPath } = config || {}
+    const { patchPath, filePath: getFilePath } = getConfig() || {}
 
     const result = await Promise.all(
       (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
@@ -93,10 +93,10 @@ class ApiController {
           }
         }
 
-        const filePath = `${`${(config?.filePath
-          ? config.filePath(fullPath)
-          : `${process.cwd()}/src${fullPath}`
-        ).replace(/\//g, '/')}${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.${extension}`}`
+        const filePath = `${`${(getFilePath ? getFilePath(fullPath) : `${process.cwd()}/src${fullPath}`).replace(
+          /\//g,
+          '/'
+        )}${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.${extension}`}`
 
         // 检测是否禁止覆盖
         const isExists = await fs.pathExists(filePath)
@@ -159,7 +159,7 @@ class ApiController {
 
     ctx.ok({
       codegen,
-      address: config?.address || [],
+      address: getConfig()?.address || [],
       languages: (languages as Language[])?.map((d) => d.type) || [],
     })
   }
@@ -179,14 +179,14 @@ class ApiController {
     ctx.ok(code)
   }
 
-  async getFormFieldsByKey(ctx: ParameterizedContext) {
+  async formjsonp(ctx: ParameterizedContext) {
     const key = ctx.query.key as string
     const codegen = await resolveCodegen(key)
 
     ctx.type = 'js'
 
     ctx.body = `(function() {
-${((await codegen.formFields?.()) || '').replace(/\s*export default\s*([\w\W]+)/, `window["schema_jsonp_${key}"]($1)`)}
+${((await codegen.formFields?.()) || '').replace(/\s*export default\s*([\w\W]+)/, `window["form_jsonp_${key}"]($1)`)}
 })()`
   }
 }

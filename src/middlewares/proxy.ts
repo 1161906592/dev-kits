@@ -4,7 +4,7 @@ import httpProxy from 'http-proxy'
 import { Middleware } from 'koa'
 import colors from 'picocolors'
 import { WebSocket, WebSocketServer } from 'ws'
-import { config } from '../common/config'
+import { getConfig } from '../common/config'
 import { loadMockCode } from '../common/repository'
 import { runScriptInSandbox } from '../common/utils'
 
@@ -96,7 +96,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
   const timerMap = new Map<string, NodeJS.Timer>()
 
   watcher.on('change', () => {
-    const options = config?.proxy || {}
+    const options = getConfig()?.proxy || {}
     const opts = options.websocket
 
     if (opts) {
@@ -176,7 +176,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
 
   // websocket
   server.on('upgrade', (req, socket, head) => {
-    const options = config?.proxy || {}
+    const options = getConfig()?.proxy || {}
     const opts = options.websocket
 
     if (opts) {
@@ -222,7 +222,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
 
     if (path.startsWith('/__swagger__')) return await next()
 
-    const options = config?.proxy || {}
+    const options = getConfig()?.proxy || {}
 
     if (options.isPass && options.isPass(ctx.path || '', address)) {
       return await next()

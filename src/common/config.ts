@@ -3,7 +3,7 @@ import { Codegen, IConfig, Language } from '..'
 import { configFile, extensions } from '../constants'
 import { findCodegen } from './utils'
 
-export let config: IConfig | undefined
+let config: IConfig | undefined
 
 export function getConfig() {
   return config

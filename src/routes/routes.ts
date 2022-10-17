@@ -9,7 +9,7 @@ router.get('/api/resources', api.resources)
 router.get('/api/swagger', api.swagger)
 router.get('/api/config', api.config)
 router.get('/api/apiCode', api.apiCode)
-router.get('/api/getFormFieldsByKey', api.getFormFieldsByKey)
+router.get('/api/formjsonp', api.formjsonp)
 router.post('/api/syncCode', api.syncCode)
 router.post('/api/codegen', api.codegen)
 

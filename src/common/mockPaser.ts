@@ -1,5 +1,5 @@
 import { Definition, Property, SwaggerV2, SwaggerV3 } from '@liuyang0826/openapi-parser'
-import { config } from './config'
+import { getConfig } from './config'
 
 function toMockTemplate(name: string, property: Property, deep: number): unknown {
   if (deep === 1 && name === 'code') {
@@ -53,7 +53,7 @@ function resolveMockTemplate(ref = '', definitions: Record<string, Definition | 
     if (!property) return
     const { type, $ref, items } = property
 
-    result[type === 'array' ? `${propName}|${config?.mock?.listCount || 6}` : propName] =
+    result[type === 'array' ? `${propName}|${getConfig()?.mock?.listCount || 6}` : propName] =
       type === 'array'
         ? [
             items?.type
@@ -61,7 +61,7 @@ function resolveMockTemplate(ref = '', definitions: Record<string, Definition | 
               : resolveMockTemplate(items?.$ref, definitions, collectors),
           ]
         : type
-        ? (config?.mock?.template || toMockTemplate)(propName, property, deep)
+        ? (getConfig()?.mock?.template || toMockTemplate)(propName, property, deep)
         : $ref
         ? resolveMockTemplate($ref, definitions, collectors)
         : undefined
