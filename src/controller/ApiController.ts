@@ -10,19 +10,20 @@ import { formatCode } from '../common/utils'
 
 class ApiController {
   async resources(ctx: ParameterizedContext) {
-    const url = ctx.query.url as string
+    const address = ctx.query.address as string
 
-    console.log(`${colors.bold('Pull swagger resources')}:  ${colors.green(url)}`)
+    console.log(`${colors.bold('Pull swagger resources')}:  ${colors.green(address)}`)
 
-    ctx.ok((await axios(url)).data)
+    ctx.ok((await axios(address)).data)
   }
 
   async swagger(ctx: ParameterizedContext) {
-    const url = ctx.query.url as string
+    const address = ctx.query.address as string
+    const suffix = ctx.query.suffix as string
 
-    console.log(`${colors.bold('Pull swagger data')}:  ${colors.green(url)}`)
+    console.log(`${colors.bold('Pull swagger data')}:  ${colors.green(address + suffix)}`)
 
-    ctx.ok((await ctx.state.loadSwagger(url)).swagger)
+    ctx.ok((await ctx.state.loadSwagger(address, suffix)).swagger)
   }
 
   async apiCode(ctx: ParameterizedContext) {

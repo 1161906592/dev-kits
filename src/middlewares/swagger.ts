@@ -31,9 +31,9 @@ export default function swaggerMiddleware(): Middleware {
   }
 
   return async (ctx, next) => {
-    ctx.state.loadSwagger = async (url?: string) => {
-      const res = await loadSwagger(url)
-      url && ctx.state.setAddress(url)
+    ctx.state.loadSwagger = async (address?: string, suffix?: string) => {
+      const res = await loadSwagger(address ? address + suffix : undefined)
+      address && ctx.state.setAddress(address)
 
       return res
     }
