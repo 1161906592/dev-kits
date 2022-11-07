@@ -7,25 +7,25 @@ import { formatCode, transformCode } from '../common/utils'
 
 class MockController {
   async mockCode(ctx: ParameterizedContext) {
+    const address = ctx.query.address as string
+    const path = ctx.query.path as string
     const method = ctx.query.method as string
     const type = ctx.query.type as string
-
-    const { address, swagger } = (await ctx.state.loadSwagger(ctx.query)) || {}
+    const fullPath = getConfig()?.patchPath?.(path, address) || path
+    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method })) || {}
     if (!swagger) throw ''
 
-    const path = getConfig()?.patchPath?.(ctx.query.path as string, address) || (ctx.query.path as string)
-
-    const mockCode = await loadMockCode(path, method, 'mock')
+    const mockCode = await loadMockCode(fullPath, method, 'mock')
     const template = mockParser(swagger, path, method)
     let saved = false
     let code = ''
 
     if (type === 'json') {
-      const jsonCode = await loadMockCode(path, method, 'json')
+      const jsonCode = await loadMockCode(fullPath, method, 'json')
       saved = !!jsonCode
       code = jsonCode || JSON.stringify(mock(mockCode ? JSON.parse(mockCode) : template), null, 2)
     } else if (type === 'script') {
-      const content = await loadMockCode(path, method, 'script')
+      const content = await loadMockCode(fullPath, method, 'script')
       const { raw = '' } = content ? JSON.parse(content) : {}
       saved = !!raw
       code = formatCode(raw || scriptParser(swagger, path, method))
@@ -42,18 +42,20 @@ class MockController {
       request: { body },
     } = ctx
 
-    const { address, swagger } = (await ctx.state.loadSwagger(body)) || {}
-    if (!swagger) throw ''
-    const path = getConfig()?.patchPath?.(body.path, address) || body.path
+    const fullPath = getConfig()?.patchPath?.(body.path, body.address) || body.path
 
-    const cur = swagger.paths?.[path]?.[body.method]
+    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method: body.method })) || {}
+
+    if (!swagger) throw ''
+
+    const cur = swagger.paths?.[body.path]?.[body.method]
 
     if (!cur) {
       throw ''
     }
 
     saveMockCode(
-      path,
+      fullPath,
       body.method,
       body.type,
       body.type === 'script'
@@ -69,12 +71,13 @@ class MockController {
       request: { body },
     } = ctx
 
-    const { address, swagger } = (await ctx.state.loadSwagger(body)) || {}
+    const fullPath = getConfig()?.patchPath?.(body.path, body.address) || body.path
+
+    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method: body.method })) || {}
+
     if (!swagger) return
 
-    const path = getConfig()?.patchPath?.(body.path, address) || body.path
-
-    removeMockCode(path, body.method, body.type)
+    removeMockCode(fullPath, body.method, body.type)
 
     ctx.ok()
   }

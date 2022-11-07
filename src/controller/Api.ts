@@ -27,15 +27,16 @@ class ApiController {
   }
 
   async apiCode(ctx: ParameterizedContext) {
+    const address = ctx.query.address as string
     const path = ctx.query.path as string
     const method = ctx.query.method as string
     const lang = ctx.query.lang as string
 
-    const { address, swagger } = (await ctx.state.loadSwagger({ path, method })) || {}
-    if (!swagger) throw ''
     const { patchPath } = getConfig() || {}
-    const program = parser(swagger, path, method)
     const fullPath = patchPath?.(path, address) || path
+    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method })) || {}
+    if (!swagger) throw ''
+    const program = parser(swagger, path, method)
 
     const realPath = (
       program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
@@ -59,20 +60,20 @@ class ApiController {
   async syncCode(ctx: ParameterizedContext) {
     const {
       request: { body },
+      query,
     } = ctx
 
-    const { address, swagger } = (await ctx.state.loadSwagger(body)) || {}
-    if (!swagger) throw ''
     const { patchPath, filePath: getFilePath } = getConfig() || {}
 
     const result = await Promise.all(
       (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
+        const fullPath = patchPath?.(path, query.address as string) || path
+        const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method })) || {}
+        if (!swagger) return
         const curPath = swagger.paths[path]
         if (!curPath) return
         const program = parser(swagger, path, method)
         if (!program) return
-
-        const fullPath = patchPath ? patchPath(path, address) : path
 
         const realPath = (
           program.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`

@@ -1,7 +1,7 @@
 import { Server } from 'node:http'
 import { FSWatcher } from 'chokidar'
 import httpProxy from 'http-proxy'
-import { Middleware } from 'koa'
+import { DefaultState, Middleware } from 'koa'
 import colors from 'picocolors'
 import { WebSocket, WebSocketServer } from 'ws'
 import { getConfig } from '../common/config'
@@ -165,10 +165,15 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
     }
   }
 
+  let state: DefaultState
+
   // websocket
-  server.on('upgrade', (req, socket, head) => {
+  server.on('upgrade', async (req, socket, head) => {
     const options = getConfig()?.proxy || {}
     const opts = options.websocket
+
+    const { address } = (await state.loadSwagger({ path: req.url, method: req.method })) || {}
+    if (!address) return
 
     if (opts) {
       for (const context in opts) {
@@ -188,7 +193,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
             // proxy
             if (options.rewrite) {
               const originUrl = req.url || ''
-              req.url = options.rewrite(originUrl)
+              req.url = options.rewrite(originUrl, address)
               req.url !== originUrl && logger('Websocket rewrite', originUrl, req.url)
             }
 
@@ -208,6 +213,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
     const { req, res, path } = ctx
     ctx.state.startPush = startPush
     ctx.state.stopPush = stopPush
+    state = ctx.state
 
     if (path.startsWith('/__swagger__')) return await next()
 
@@ -217,14 +223,14 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
       return await next()
     }
 
-    if (options.rewrite) {
-      const originUrl = req.url || ''
-      req.url = options.rewrite(originUrl)
-      req.url !== originUrl && logger('Proxy rewrite', originUrl, req.url)
-    }
-
     const { address } = (await ctx.state.loadSwagger(ctx)) || {}
     if (!address) return
+
+    if (options.rewrite) {
+      const originUrl = req.url || ''
+      req.url = options.rewrite(originUrl, address)
+      req.url !== originUrl && logger('Proxy rewrite', originUrl, req.url)
+    }
 
     const opts = { target: new URL(address).origin, ...options }
     logger('Proxy', req.url || '', opts.target.toString())
