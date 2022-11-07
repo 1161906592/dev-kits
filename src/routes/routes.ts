@@ -1,15 +1,15 @@
 import KoaRouter from '@koa/router'
+import { internalPrefix } from '../constants'
 import api from '../controller/ApiController'
 import mock from '../controller/MockController'
 import ws from '../controller/WSController'
 
-const router = new KoaRouter({ prefix: '/__swagger__' })
+const router = new KoaRouter({ prefix: internalPrefix })
 
 router.get('/api/resources', api.resources)
 router.get('/api/swagger', api.swagger)
 router.get('/api/config', api.config)
 router.get('/api/apiCode', api.apiCode)
-router.get('/api/formjsonp', api.formjsonp)
 router.post('/api/syncCode', api.syncCode)
 router.post('/api/codegen', api.codegen)
 

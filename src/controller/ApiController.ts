@@ -179,17 +179,6 @@ class ApiController {
 
     ctx.ok(code)
   }
-
-  async formjsonp(ctx: ParameterizedContext) {
-    const key = ctx.query.key as string
-    const codegen = await resolveCodegen(key)
-
-    ctx.type = 'js'
-
-    ctx.body = `(function() {
-${((await codegen.formFields?.()) || '').replace(/\s*export default\s*([\w\W]+)/, `window["form_jsonp_${key}"]($1)`)}
-})()`
-  }
 }
 
 export default new ApiController()

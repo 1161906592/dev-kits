@@ -1,12 +1,18 @@
+import Router from '@koa/router'
 import { loadConfig } from 'unconfig'
 import { Codegen, IConfig, Language } from '..'
 import { configFile, extensions } from '../constants'
 import { findCodegen } from './utils'
 
 let config: IConfig | undefined
+let router: Router | undefined
 
 export function getConfig() {
   return config
+}
+
+export function getRouter() {
+  return router
 }
 
 export async function parseConfig() {
@@ -21,6 +27,7 @@ export async function parseConfig() {
   })
 
   config = result.config
+  router = config.patchRouter?.(Router)
 }
 
 export async function resolveCodegen(): Promise<Codegen[]>

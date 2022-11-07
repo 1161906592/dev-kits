@@ -8,6 +8,7 @@ import colors from 'picocolors'
 import { parseConfig } from './common/config'
 import { pathMock } from './common/pathMock'
 import { dataDir, configFile, extensions } from './constants'
+import extraRoutesMiddleware from './middlewares/extraRoutes'
 import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
 import responseMiddleware from './middlewares/response'
@@ -34,6 +35,7 @@ app.use(mockMiddleware())
 app.use(koaBody())
 app.use(responseMiddleware())
 app.use(router.routes())
+app.use(extraRoutesMiddleware())
 
 // fixed port
 server.listen(51965, () => {

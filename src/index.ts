@@ -1,5 +1,6 @@
 import { Property } from '@liuyang0826/openapi-parser'
 import * as HttpProxy from 'http-proxy'
+import type Router from '@koa/router'
 
 export type MaybePromise<T> = T | Promise<T>
 
@@ -8,7 +9,6 @@ export interface Codegen {
   key: string
   children?: Codegen[]
   render?(model: Record<string, unknown>, options: string[]): MaybePromise<string>
-  formFields?(): MaybePromise<string | void>
 }
 
 export interface Address {
@@ -43,6 +43,7 @@ export interface IConfig {
   proxy?: ProxyOptions
   mock?: MockOptions
   languages: Language[] | ((id?: string) => MaybePromise<Language | Language[]>)
+  patchRouter?(KoaRouter: typeof Router): Router
 }
 
 export function defineConfig(config: IConfig) {
