@@ -23,7 +23,7 @@ class ApiController {
 
     console.log(`${colors.bold('Pull swagger data')}:  ${colors.green(address + suffix)}`)
 
-    ctx.ok((await ctx.state.loadSwagger(address, suffix)).swagger)
+    ctx.ok(await ctx.state.loadSwagger({ address, suffix }))
   }
 
   async apiCode(ctx: ParameterizedContext) {
@@ -31,11 +31,11 @@ class ApiController {
     const method = ctx.query.method as string
     const lang = ctx.query.lang as string
 
-    const swagger = (await ctx.state.loadSwagger()).swagger
+    const { address, swagger } = (await ctx.state.loadSwagger({ path, method })) || {}
     if (!swagger) throw ''
     const { patchPath } = getConfig() || {}
     const program = parser(swagger, path, method)
-    const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
+    const fullPath = patchPath?.(path, address) || path
 
     const realPath = (
       program?.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`
@@ -61,7 +61,7 @@ class ApiController {
       request: { body },
     } = ctx
 
-    const swagger = (await ctx.state.loadSwagger()).swagger
+    const { address, swagger } = (await ctx.state.loadSwagger(body)) || {}
     if (!swagger) throw ''
     const { patchPath, filePath: getFilePath } = getConfig() || {}
 
@@ -72,7 +72,7 @@ class ApiController {
         const program = parser(swagger, path, method)
         if (!program) return
 
-        const fullPath = patchPath ? patchPath(path, ctx.state.getAddress()) : path
+        const fullPath = patchPath ? patchPath(path, address) : path
 
         const realPath = (
           program.pathVar ? `\`${fullPath.replace(/\{(.+?)\}/g, `\${pathVar["$1"]}`)}\`` : `"${fullPath}"`

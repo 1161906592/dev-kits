@@ -9,21 +9,19 @@ export default function mockMiddleware(): Middleware {
   return async (ctx, next) => {
     if (ctx.path.startsWith('/__swagger__')) return await next()
 
-    const { swagger, pathMap } = (await ctx.state.loadSwagger()) || {}
-    if (!swagger || !pathMap) return await next()
+    const { swagger } = (await ctx.state.loadSwagger(ctx)) || {}
+    if (!swagger) return await next()
 
-    const path = pathMap[ctx.path]
-    if (!path) return await next()
-
+    const path = ctx.path
     console.log(`${colors.bold('Mock')}:  ${colors.green(ctx.path)}`)
     await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
 
     try {
       const method = ctx.method.toLocaleLowerCase()
-      const mockCode = await loadMockCode(path, method, 'mock')
       const mockType = ctx.headers['x-mock-type']
 
       if (mockType === 'json') {
+        const mockCode = await loadMockCode(path, method, 'mock')
         const mockJSON = mockCode ? mock(mockCode) : await loadMockCode(path, method, 'json')
         ctx.body = mockJSON || mock(mockParser(swagger, path, method))
       } else if (mockType === 'script') {
@@ -35,6 +33,7 @@ export default function mockMiddleware(): Middleware {
           dayjs: require('dayjs'),
         })
       } else {
+        const mockCode = await loadMockCode(path, method, 'mock')
         ctx.body = mock(mockCode ? JSON.parse(mockCode) : mockParser(swagger, path, method))
       }
 

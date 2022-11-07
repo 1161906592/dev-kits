@@ -18,9 +18,9 @@ export interface Address {
 }
 
 export interface ProxyOptions extends HttpProxy.ServerOptions {
-  rewrite?: (path: string, address: string) => string
+  rewrite?: (path: string) => string
   configure?: (proxy: HttpProxy, options: ProxyOptions) => void
-  isPass?: (path: string, address: string) => unknown
+  isPass?: (path: string) => unknown
   websocket?: Record<string, string>
 }
 

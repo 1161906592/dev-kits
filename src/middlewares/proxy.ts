@@ -12,15 +12,6 @@ const logger = (type: string, from: string, to: string) =>
   console.log(`${colors.bold(type)}:  ${colors.green(from)} -> ${colors.cyan(to)}`)
 
 export default function proxyMiddleware(server: Server, watcher: FSWatcher): Middleware {
-  // 当前文档地址
-  let address = ''
-
-  const setAddress = (_address: string) => {
-    address = _address
-  }
-
-  const getAddress = () => address
-
   const proxy = httpProxy.createProxyServer({
     changeOrigin: true,
   })
@@ -103,7 +94,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
       Array.from(socketMap.keys()).forEach((url) => {
         for (const context in opts) {
           if (doesProxyContextMatchUrl(context, url)) {
-            if (!opts[context].startsWith('ws') || !options.isPass || !options.isPass(url, address)) {
+            if (!opts[context].startsWith('ws') || !options.isPass || !options.isPass(url)) {
               // 断开连接
               socketMap.get(url)?.forEach((socket) => socket.close())
               socketMap.delete(url)
@@ -188,7 +179,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
         }
 
         if (doesProxyContextMatchUrl(context, req.url || '')) {
-          if (options.isPass && options.isPass(req.url || '', address)) {
+          if (options.isPass && options.isPass(req.url || '')) {
             // mock
             ws.handleUpgrade(req, socket, head, (socket) => {
               ws.emit('connection', socket, req)
@@ -197,7 +188,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
             // proxy
             if (options.rewrite) {
               const originUrl = req.url || ''
-              req.url = options.rewrite(originUrl, address)
+              req.url = options.rewrite(originUrl)
               req.url !== originUrl && logger('Websocket rewrite', originUrl, req.url)
             }
 
@@ -215,8 +206,6 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
 
   return async (ctx, next) => {
     const { req, res, path } = ctx
-    ctx.state.setAddress = setAddress
-    ctx.state.getAddress = getAddress
     ctx.state.startPush = startPush
     ctx.state.stopPush = stopPush
 
@@ -224,15 +213,18 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
 
     const options = getConfig()?.proxy || {}
 
-    if (options.isPass && options.isPass(ctx.path || '', address)) {
+    if (options.isPass && options.isPass(ctx.path || '')) {
       return await next()
     }
 
     if (options.rewrite) {
       const originUrl = req.url || ''
-      req.url = options.rewrite(originUrl, address)
+      req.url = options.rewrite(originUrl)
       req.url !== originUrl && logger('Proxy rewrite', originUrl, req.url)
     }
+
+    const { address } = (await ctx.state.loadSwagger(ctx)) || {}
+    if (!address) return
 
     const opts = { target: new URL(address).origin, ...options }
     logger('Proxy', req.url || '', opts.target.toString())

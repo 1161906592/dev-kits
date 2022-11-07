@@ -4,38 +4,36 @@ import { Middleware } from 'koa'
 import { getConfig } from '../common/config'
 
 export default function swaggerMiddleware(): Middleware {
-  let swaggerData: Promise<{ swagger: SwaggerV2 | SwaggerV3; pathMap: Record<string, string | undefined> } | null> =
-    Promise.resolve(null)
-
-  const loadSwagger = (url?: string) => {
-    if (url) {
-      swaggerData = axios.get<SwaggerV2 | SwaggerV3>(url).then((res) => {
-        const patchPath = getConfig()?.patchPath
-
-        const pathMap: Record<string, string | undefined> = {}
-
-        if (res.data) {
-          Object.keys(res.data.paths).forEach((path) => {
-            pathMap[(patchPath?.(path, url) || path).replace(/\/+/g, '/')] = path
-          })
-        }
-
-        return {
-          swagger: res.data,
-          pathMap,
-        }
-      })
-    }
-
-    return swaggerData
-  }
+  const swaggerRecords: {
+    address: string
+    loader: Promise<SwaggerV2 | SwaggerV3 | null>
+  }[] = []
 
   return async (ctx, next) => {
-    ctx.state.loadSwagger = async (address?: string, suffix?: string) => {
-      const res = await loadSwagger(address ? address + suffix : undefined)
-      address && ctx.state.setAddress(address)
+    ctx.state.loadSwagger = async (options: { address?: string; suffix?: string; path?: string; method?: string }) => {
+      const { address, suffix, path = '', method = '' } = options
 
-      return res
+      if (address) {
+        const loader = axios.get<SwaggerV2 | SwaggerV3>(address + suffix).then((res) => res.data)
+        const index = swaggerRecords.findIndex((d) => d.address === address)
+
+        if (index !== -1) {
+          swaggerRecords.splice(index, 1)
+        }
+
+        swaggerRecords.unshift({ address, loader })
+
+        return loader
+      } else {
+        for (let index = 0; index < swaggerRecords.length; index += 1) {
+          const { loader, address } = swaggerRecords[index]
+          const swagger = await loader
+
+          if (swagger?.paths[getConfig()?.patchPath?.(path, address) || path]?.[method.toLowerCase()]) {
+            return { address, swagger }
+          }
+        }
+      }
     }
 
     await next()

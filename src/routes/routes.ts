@@ -1,8 +1,8 @@
 import KoaRouter from '@koa/router'
 import { internalPrefix } from '../constants'
-import api from '../controller/ApiController'
-import mock from '../controller/MockController'
-import ws from '../controller/WSController'
+import api from '../controller/Api'
+import mock from '../controller/Mock'
+import ws from '../controller/WS'
 
 const router = new KoaRouter({ prefix: internalPrefix })
 

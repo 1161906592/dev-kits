@@ -27,10 +27,10 @@ watcher.on('change', async () => {
 
 const app = new Koa()
 const server = http.createServer(app.callback())
+app.use(swaggerMiddleware())
 // 代理中间件最高优先级
 app.use(proxyMiddleware(server, watcher))
 app.use(cors())
-app.use(swaggerMiddleware())
 app.use(mockMiddleware())
 app.use(koaBody())
 app.use(responseMiddleware())
