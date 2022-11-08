@@ -28,7 +28,7 @@ export default function swaggerMiddleware(): Middleware {
 
             if (/\{(.+?)\}/.test(path)) {
               varPaths.push({
-                regExp: new RegExp(path.replace(/\{.+?\}/g, '[^/]+')),
+                regExp: new RegExp(`^${fullPath.replace(/\{.+?\}/g, '[^/]+')}`),
                 methods: res.data.paths[path],
               })
             } else {
