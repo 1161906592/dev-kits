@@ -2,11 +2,6 @@ import { format } from 'prettier'
 import { NodeVM } from 'vm2'
 import { Codegen } from '..'
 
-// 匹配引用类型的名称
-export function matchInterfaceName($ref?: string) {
-  return $ref?.match(/#\/definitions\/(\w+).*/)?.[1] || ''
-}
-
 export function sleep(timeout: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, timeout)

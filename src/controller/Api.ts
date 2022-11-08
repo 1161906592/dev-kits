@@ -6,6 +6,7 @@ import { ParameterizedContext } from 'koa'
 import colors from 'picocolors'
 import { Language } from 'src'
 import { getConfig, resolveCodegen, resolveLanguages } from '../common/config'
+import { loadSwagger, findSwager } from '../common/swagger'
 import { formatCode } from '../common/utils'
 
 class ApiController {
@@ -23,7 +24,7 @@ class ApiController {
 
     console.log(`${colors.bold('Pull swagger data')}:  ${colors.green(address + suffix)}`)
 
-    ctx.ok(await ctx.state.loadSwagger({ address, suffix }))
+    ctx.ok(await loadSwagger({ address, suffix }))
   }
 
   async apiCode(ctx: ParameterizedContext) {
@@ -34,8 +35,8 @@ class ApiController {
 
     const { patchPath } = getConfig() || {}
     const fullPath = patchPath?.(path, address) || path
-    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method })) || {}
-    if (!swagger) throw ''
+    const { swagger } = (await findSwager({ fullPath, method })) || {}
+    if (!swagger) return
     const program = parser(swagger, path, method)
 
     const realPath = (
@@ -68,7 +69,7 @@ class ApiController {
     const result = await Promise.all(
       (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
         const fullPath = patchPath?.(path, query.address as string) || path
-        const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method })) || {}
+        const { swagger } = (await findSwager({ fullPath, method })) || {}
         if (!swagger) return
         const curPath = swagger.paths[path]
         if (!curPath) return

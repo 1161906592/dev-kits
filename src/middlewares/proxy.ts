@@ -1,11 +1,12 @@
 import { Server } from 'node:http'
 import { FSWatcher } from 'chokidar'
 import httpProxy from 'http-proxy'
-import { DefaultState, Middleware } from 'koa'
+import { Middleware } from 'koa'
 import colors from 'picocolors'
 import { WebSocket, WebSocketServer } from 'ws'
 import { getConfig } from '../common/config'
 import { loadMockCode } from '../common/repository'
+import { findSwager } from '../common/swagger'
 import { runScriptInSandbox } from '../common/utils'
 
 const logger = (type: string, from: string, to: string) =>
@@ -165,14 +166,12 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
     }
   }
 
-  let state: DefaultState
-
   // websocket
   server.on('upgrade', async (req, socket, head) => {
     const options = getConfig()?.proxy || {}
     const opts = options.websocket
 
-    const { address } = (await state.loadSwagger({ path: req.url, method: req.method })) || {}
+    const { address } = (await findSwager({ fullPath: req.url || '', method: req.method || '' })) || {}
     if (!address) return
 
     if (opts) {
@@ -213,7 +212,6 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
     const { req, res, path } = ctx
     ctx.state.startPush = startPush
     ctx.state.stopPush = stopPush
-    state = ctx.state
 
     if (path.startsWith('/__swagger__')) return await next()
 
@@ -223,7 +221,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
       return await next()
     }
 
-    const { address } = (await ctx.state.loadSwagger(ctx)) || {}
+    const { address } = (await findSwager({ fullPath: ctx.path, method: ctx.method })) || {}
     if (!address) return
 
     if (options.rewrite) {

@@ -3,13 +3,14 @@ import { mock } from 'mockjs'
 import colors from 'picocolors'
 import { mockParser, scriptParser } from '../common/mockPaser'
 import { loadMockCode } from '../common/repository'
+import { findSwager } from '../common/swagger'
 import { runScriptInSandbox, sleep } from '../common/utils'
 
 export default function mockMiddleware(): Middleware {
   return async (ctx, next) => {
     if (ctx.path.startsWith('/__swagger__')) return await next()
 
-    const { swagger } = (await ctx.state.loadSwagger(ctx)) || {}
+    const { swagger } = (await findSwager({ fullPath: ctx.path, method: ctx.method })) || {}
     if (!swagger) return await next()
 
     const path = ctx.path

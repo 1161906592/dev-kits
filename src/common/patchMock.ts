@@ -8,7 +8,7 @@ const Constant = {
   // RE_KEY: /^key$/
 }
 
-export function pathMock() {
+export default function patchMock() {
   const { Random, Handler, Util } = require('mockjs')
 
   Handler.placeholder = function (placeholder: any, obj: any, templateContext: any, options: any) {

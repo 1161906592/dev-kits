@@ -3,6 +3,7 @@ import { mock } from 'mockjs'
 import { getConfig } from '../common/config'
 import { mockParser, scriptParser } from '../common/mockPaser'
 import { loadMockCode, removeMockCode, saveMockCode } from '../common/repository'
+import { findSwager } from '../common/swagger'
 import { formatCode, transformCode } from '../common/utils'
 
 class MockController {
@@ -12,8 +13,8 @@ class MockController {
     const method = ctx.query.method as string
     const type = ctx.query.type as string
     const fullPath = getConfig()?.patchPath?.(path, address) || path
-    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method })) || {}
-    if (!swagger) throw ''
+    const { swagger } = (await findSwager({ fullPath, method })) || {}
+    if (!swagger) return
 
     const mockCode = await loadMockCode(fullPath, method, 'mock')
     const template = mockParser(swagger, path, method)
@@ -43,16 +44,10 @@ class MockController {
     } = ctx
 
     const fullPath = getConfig()?.patchPath?.(body.path, body.address) || body.path
-
-    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method: body.method })) || {}
-
-    if (!swagger) throw ''
-
+    const { swagger } = (await findSwager({ fullPath, method: body.method })) || {}
+    if (!swagger) return
     const cur = swagger.paths?.[body.path]?.[body.method]
-
-    if (!cur) {
-      throw ''
-    }
+    if (!cur) return
 
     saveMockCode(
       fullPath,
@@ -73,7 +68,7 @@ class MockController {
 
     const fullPath = getConfig()?.patchPath?.(body.path, body.address) || body.path
 
-    const { swagger } = (await ctx.state.loadSwagger({ path: fullPath, method: body.method })) || {}
+    const { swagger } = (await findSwager({ fullPath, method: body.method })) || {}
 
     if (!swagger) return
 

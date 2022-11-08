@@ -6,28 +6,23 @@ import Koa from 'koa'
 import koaBody from 'koa-body'
 import colors from 'picocolors'
 import { parseConfig } from './common/config'
-import { pathMock } from './common/pathMock'
+import patchMock from './common/patchMock'
 import { dataDir, configFile, extensions } from './constants'
 import extraRoutesMiddleware from './middlewares/extraRoutes'
 import mockMiddleware from './middlewares/mock'
 import proxyMiddleware from './middlewares/proxy'
 import responseMiddleware from './middlewares/response'
-import swaggerMiddleware from './middlewares/swagger'
 import router from './routes/routes'
 
-pathMock()
+patchMock()
 fs.ensureDir(dataDir)
 
 parseConfig()
 const watcher = chokidar.watch(`./${configFile}.{${extensions.join(',')}}`)
-
-watcher.on('change', async () => {
-  parseConfig()
-})
+watcher.on('change', () => parseConfig())
 
 const app = new Koa()
 const server = http.createServer(app.callback())
-app.use(swaggerMiddleware())
 // 代理中间件最高优先级
 app.use(proxyMiddleware(server, watcher))
 app.use(cors())
