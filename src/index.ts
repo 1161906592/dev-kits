@@ -1,6 +1,6 @@
+import * as Router from '@koa/router'
 import { Property } from '@liuyang0826/openapi-parser'
 import * as HttpProxy from 'http-proxy'
-import type Router from '@koa/router'
 
 export type MaybePromise<T> = T | Promise<T>
 
@@ -43,7 +43,7 @@ export interface IConfig {
   proxy?: ProxyOptions
   mock?: MockOptions
   languages: Language[] | ((id?: string) => MaybePromise<Language | Language[]>)
-  patchRouter?(KoaRouter: typeof Router): Router
+  patchRouter?(KoaRouter: Router): Router
   // 最大缓存文档数量
   maxSize?: number
 }
