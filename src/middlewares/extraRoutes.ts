@@ -6,7 +6,7 @@ export default function extraRoutesMiddleware(): Middleware {
   return async (ctx, next) => {
     if (ctx.path.startsWith(`${internalPrefix}/extra`)) {
       ctx.path = ctx.path.substring(`${internalPrefix}/extra`.length)
-      await getRouter()?.routes()(ctx as any, next)
+      await (await getRouter())?.routes()(ctx as any, next)
     }
   }
 }

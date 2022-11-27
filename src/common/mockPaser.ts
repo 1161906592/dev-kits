@@ -36,7 +36,11 @@ function toMockTemplate(name: string, property: Property, deep: number): unknown
   }
 }
 
-function resolveMockTemplate(ref = '', definitions: Record<string, Definition | undefined>, collectors: string[]) {
+async function resolveMockTemplate(
+  ref = '',
+  definitions: Record<string, Definition | undefined>,
+  collectors: string[]
+) {
   if (!ref || collectors.includes(ref)) return
   collectors.push(ref)
   const deep = collectors.length
@@ -47,13 +51,14 @@ function resolveMockTemplate(ref = '', definitions: Record<string, Definition | 
 
   if (!properties) return
   const result: Record<string, unknown> = {}
+  const mock = (await getConfig())?.mock
 
   Object.keys(properties).forEach((propName) => {
     const property = properties[propName]
     if (!property) return
     const { type, $ref, items } = property
 
-    result[type === 'array' ? `${propName}|${getConfig()?.mock?.listCount || 6}` : propName] =
+    result[type === 'array' ? `${propName}|${mock?.listCount || 6}` : propName] =
       type === 'array'
         ? [
             items?.type
@@ -61,7 +66,7 @@ function resolveMockTemplate(ref = '', definitions: Record<string, Definition | 
               : resolveMockTemplate(items?.$ref, definitions, collectors),
           ]
         : type
-        ? (getConfig()?.mock?.template || toMockTemplate)(propName, property, deep)
+        ? (mock?.template || toMockTemplate)(propName, property, deep)
         : $ref
         ? resolveMockTemplate($ref, definitions, collectors)
         : undefined
@@ -72,16 +77,16 @@ function resolveMockTemplate(ref = '', definitions: Record<string, Definition | 
   return result
 }
 
-export function mockParser(swagger: SwaggerV2 | SwaggerV3, path: string, method: string) {
+export async function mockParser(swagger: SwaggerV2 | SwaggerV3, path: string, method: string) {
   if ((swagger as SwaggerV2).definitions) {
-    return resolveMockTemplate(
+    return await resolveMockTemplate(
       (swagger as SwaggerV2).paths[path]?.[method]?.responses[200].schema?.$ref,
       (swagger as SwaggerV2).definitions,
       []
     )
   }
 
-  return resolveMockTemplate(
+  return await resolveMockTemplate(
     Object.values((swagger as SwaggerV3).paths[path]?.[method]?.responses[200]?.content || {})[0]?.schema?.$ref,
     (swagger as SwaggerV3).components.schemas,
     []

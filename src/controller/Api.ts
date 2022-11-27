@@ -33,7 +33,7 @@ class ApiController {
     const method = ctx.query.method as string
     const lang = ctx.query.lang as string
 
-    const { patchPath } = getConfig() || {}
+    const { patchPath } = (await getConfig()) || {}
     const fullPath = patchPath?.(path, address) || path
     const { swagger } = (await findSwager({ fullPath, method })) || {}
     if (!swagger) return
@@ -64,7 +64,7 @@ class ApiController {
       query,
     } = ctx
 
-    const { patchPath, filePath: getFilePath } = getConfig() || {}
+    const { patchPath, filePath: getFilePath } = (await getConfig()) || {}
 
     const result = await Promise.all(
       (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
@@ -162,7 +162,7 @@ class ApiController {
 
     ctx.ok({
       codegen,
-      address: getConfig()?.address || [],
+      address: (await getConfig())?.address || [],
       languages: (languages as Language[])?.map((d) => d.type) || [],
     })
   }

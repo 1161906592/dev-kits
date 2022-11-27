@@ -13,7 +13,7 @@ const swaggerRecords: {
 
 export async function loadSwagger(options: { address: string; suffix: string }) {
   const { address, suffix } = options
-  const patchPath = getConfig()?.patchPath
+  const patchPath = (await getConfig())?.patchPath
 
   const loader = axios.get<SwaggerV2 | SwaggerV3>(address + suffix).then((res) => {
     const pathMap: Record<string, Record<string, unknown> | undefined> = {}
@@ -43,7 +43,7 @@ export async function loadSwagger(options: { address: string; suffix: string }) 
 
   swaggerRecords.unshift({ address, loader })
 
-  if (swaggerRecords.length > (getConfig()?.maxSize || 30)) {
+  if (swaggerRecords.length > ((await getConfig())?.maxSize || 30)) {
     swaggerRecords.pop()
   }
 

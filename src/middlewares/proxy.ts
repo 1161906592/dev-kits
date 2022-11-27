@@ -87,15 +87,18 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
 
   const timerMap = new Map<string, NodeJS.Timer>()
 
-  watcher.on('change', () => {
-    const options = getConfig()?.proxy || {}
+  watcher.on('change', async () => {
+    const options = (await getConfig())?.proxy || {}
     const opts = options.websocket
 
-    if (opts) {
+    if (opts && Object.keys(opts).length) {
       Array.from(socketMap.keys()).forEach((url) => {
         for (const context in opts) {
           if (doesProxyContextMatchUrl(context, url)) {
-            if (!opts[context].startsWith('ws') || !options.isPass || !options.isPass(url)) {
+            const item = opts[context]
+            const target = typeof item === 'string' ? item : item.target?.toString()
+
+            if (!target?.startsWith('ws') || !options.isPass || !options.isPass(url)) {
               // 断开连接
               socketMap.get(url)?.forEach((socket) => socket.close())
               socketMap.delete(url)
@@ -168,16 +171,16 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
 
   // websocket
   server.on('upgrade', async (req, socket, head) => {
-    const options = getConfig()?.proxy || {}
+    const options = (await getConfig())?.proxy || {}
     const opts = options.websocket
-
-    const { address } = (await findSwager({ fullPath: req.url || '', method: req.method || '' })) || {}
-    if (!address) return
 
     if (opts) {
       for (const context in opts) {
-        if (!opts[context].startsWith('ws')) {
-          console.log(`${colors.red(opts[context])} is not a websocket url!`)
+        const item = opts[context]
+        const target = typeof item === 'string' ? item : item.target?.toString()
+
+        if (!target?.toString().startsWith('ws')) {
+          console.log(`${colors.red(target?.toString())} is not a websocket url!`)
 
           continue
         }
@@ -190,13 +193,13 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
             })
           } else {
             // proxy
-            if (options.rewrite) {
+            if (typeof item !== 'string' && item.rewrite) {
               const originUrl = req.url || ''
-              req.url = options.rewrite(originUrl, address)
+              req.url = item.rewrite(originUrl)
               req.url !== originUrl && logger('Websocket rewrite', originUrl, req.url)
             }
 
-            logger('Websocket proxy', req.url || '', opts[context])
+            logger('Websocket proxy', req.url || '', target)
             proxy.ws(req, socket, head, { target: opts[context], ...options })
           }
 
@@ -214,8 +217,7 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
     ctx.state.stopPush = stopPush
 
     if (path.startsWith('/__swagger__')) return await next()
-
-    const options = getConfig()?.proxy || {}
+    const options = (await getConfig())?.proxy || {}
 
     if (options.isPass && options.isPass(ctx.path || '')) {
       return await next()

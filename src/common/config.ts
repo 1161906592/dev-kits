@@ -4,19 +4,26 @@ import { Codegen, IConfig, Language } from '..'
 import { configFile, extensions } from '../constants'
 import { findCodegen } from './utils'
 
-let config: IConfig | undefined
-let router: Router | undefined
+let config: Promise<IConfig> | undefined
+let router: Promise<Router | undefined> | undefined
 
 export function getConfig() {
   return config
 }
 
 export function getRouter() {
-  return router
+  return (
+    router ||
+    (router = config?.then(({ patchRouter }) => {
+      return patchRouter?.(Router)
+    }))
+  )
 }
 
 export async function parseConfig() {
-  const result = await loadConfig<IConfig>({
+  router = undefined
+
+  config = loadConfig<IConfig>({
     sources: [
       {
         files: configFile,
@@ -24,10 +31,9 @@ export async function parseConfig() {
       },
     ],
     merge: false,
+  }).then((result) => {
+    return result.config
   })
-
-  config = result.config
-  router = config.patchRouter?.(Router)
 }
 
 export async function resolveCodegen(): Promise<Codegen[]>
@@ -35,15 +41,17 @@ export async function resolveCodegen(): Promise<Codegen[]>
 export async function resolveCodegen(id: string): Promise<Codegen>
 
 export async function resolveCodegen(id?: string) {
-  if (typeof config?.codegen === 'function') {
-    return await config.codegen(id)
+  const codegen = (await config)?.codegen
+
+  if (typeof codegen === 'function') {
+    return await codegen(id)
   }
 
   if (id !== undefined) {
-    return findCodegen(config?.codegen || [], id)
+    return findCodegen(codegen || [], id)
   }
 
-  return config?.codegen || []
+  return codegen || []
 }
 
 export async function resolveLanguages(): Promise<Language[]>
@@ -51,13 +59,15 @@ export async function resolveLanguages(): Promise<Language[]>
 export async function resolveLanguages(type: string): Promise<Language>
 
 export async function resolveLanguages(type?: string) {
-  if (typeof config?.languages === 'function') {
-    return await config.languages(type)
+  const languages = (await config)?.languages
+
+  if (typeof languages === 'function') {
+    return await languages(type)
   }
 
   if (type !== undefined) {
-    return (config?.languages || []).find((d) => d.type === type)
+    return (languages || []).find((d) => d.type === type)
   }
 
-  return config?.languages || []
+  return languages || []
 }

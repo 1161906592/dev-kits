@@ -1,4 +1,4 @@
-import * as Router from '@koa/router'
+import Router from '@koa/router'
 import { Property } from '@liuyang0826/openapi-parser'
 import * as HttpProxy from 'http-proxy'
 
@@ -21,7 +21,7 @@ export interface ProxyOptions extends HttpProxy.ServerOptions {
   rewrite?: (path: string, address: string) => string
   configure?: (proxy: HttpProxy, options: ProxyOptions) => void
   isPass?: (path: string) => unknown
-  websocket?: Record<string, string>
+  websocket?: Record<string, string | ({ rewrite?: (path: string) => string } & HttpProxy.ServerOptions)>
 }
 
 export interface MockOptions {
@@ -43,7 +43,7 @@ export interface IConfig {
   proxy?: ProxyOptions
   mock?: MockOptions
   languages: Language[] | ((id?: string) => MaybePromise<Language | Language[]>)
-  patchRouter?(KoaRouter: Router): Router
+  patchRouter?(KoaRouter: typeof Router): Router
   // 最大缓存文档数量
   maxSize?: number
 }

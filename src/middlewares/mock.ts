@@ -24,7 +24,7 @@ export default function mockMiddleware(): Middleware {
       if (mockType === 'json') {
         const mockCode = await loadMockCode(path, method, 'mock')
         const mockJSON = mockCode ? mock(mockCode) : await loadMockCode(path, method, 'json')
-        ctx.body = mockJSON || mock(mockParser(swagger, path, method))
+        ctx.body = mockJSON || (await mock(mockParser(swagger, path, method)))
       } else if (mockType === 'script') {
         const content = await loadMockCode(path, method, 'script')
         const { code = '' } = content ? JSON.parse(content) : {}
@@ -35,7 +35,7 @@ export default function mockMiddleware(): Middleware {
         })
       } else {
         const mockCode = await loadMockCode(path, method, 'mock')
-        ctx.body = mock(mockCode ? JSON.parse(mockCode) : mockParser(swagger, path, method))
+        ctx.body = mock(mockCode ? JSON.parse(mockCode) : await mockParser(swagger, path, method))
       }
 
       ctx.type = 'json'
