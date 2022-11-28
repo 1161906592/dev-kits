@@ -10,10 +10,9 @@ export default function mockMiddleware(): Middleware {
   return async (ctx, next) => {
     if (ctx.path.startsWith('/__swagger__')) return await next()
 
-    const { swagger } = (await findSwager({ fullPath: ctx.path, method: ctx.method })) || {}
-    if (!swagger) return await next()
+    const { swagger, path } = (await findSwager({ fullPath: ctx.path, method: ctx.method })) || {}
+    if (!swagger || !path) return await next()
 
-    const path = ctx.path
     console.log(`${colors.bold('Mock')}:  ${colors.green(ctx.path)}`)
     await sleep(Number(ctx.headers['x-mock-timeout']) || 0)
 
@@ -29,7 +28,7 @@ export default function mockMiddleware(): Middleware {
         const content = await loadMockCode(path, method, 'script')
         const { code = '' } = content ? JSON.parse(content) : {}
 
-        ctx.body = await runScriptInSandbox(code || scriptParser(swagger, path, method))({
+        ctx.body = await runScriptInSandbox(code || (await scriptParser(swagger, path, method)))({
           Mockjs: require('mockjs'),
           dayjs: require('dayjs'),
         })

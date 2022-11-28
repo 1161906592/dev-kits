@@ -29,7 +29,7 @@ class MockController {
       const content = await loadMockCode(fullPath, method, 'script')
       const { raw = '' } = content ? JSON.parse(content) : {}
       saved = !!raw
-      code = formatCode(raw || scriptParser(swagger, path, method))
+      code = formatCode(raw || (await scriptParser(swagger, path, method)))
     } else {
       saved = !!mockCode
       code = mockCode || JSON.stringify(template, null, 2)

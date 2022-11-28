@@ -6,8 +6,8 @@ const swaggerRecords: {
   address: string
   loader: Promise<{
     swagger: SwaggerV2 | SwaggerV3 | null
-    pathMap: Record<string, Record<string, unknown> | undefined>
-    varPaths: { regExp: RegExp; methods: Record<string, unknown> | undefined }[]
+    pathMap: Record<string, { methods: Record<string, unknown> | undefined; path: string } | undefined>
+    varPaths: { regExp: RegExp; methods: Record<string, unknown> | undefined; path: string }[]
   }>
 }[] = []
 
@@ -16,8 +16,8 @@ export async function loadSwagger(options: { address: string; suffix: string }) 
   const patchPath = (await getConfig())?.patchPath
 
   const loader = axios.get<SwaggerV2 | SwaggerV3>(address + suffix).then((res) => {
-    const pathMap: Record<string, Record<string, unknown> | undefined> = {}
-    const varPaths: { regExp: RegExp; methods: Record<string, unknown> | undefined }[] = []
+    const pathMap: Record<string, { methods: Record<string, unknown> | undefined; path: string } | undefined> = {}
+    const varPaths: { regExp: RegExp; methods: Record<string, unknown> | undefined; path: string }[] = []
 
     Object.keys(res.data.paths).forEach((path) => {
       const fullPath = patchPath?.(path, address) || path
@@ -26,9 +26,10 @@ export async function loadSwagger(options: { address: string; suffix: string }) 
         varPaths.push({
           regExp: new RegExp(`^${fullPath.replace(/\{.+?\}/g, '[^/]+')}`),
           methods: res.data.paths[path],
+          path,
         })
       } else {
-        pathMap[fullPath] = res.data.paths[path]
+        pathMap[fullPath] = { methods: res.data.paths[path], path }
       }
     })
 
@@ -58,11 +59,16 @@ export async function findSwager(options: { fullPath: string; method: string }) 
     const { swagger, pathMap, varPaths } = await loader
     const lowerCaseMethod = method.toLowerCase()
 
-    if (
-      pathMap[fullPath]?.[lowerCaseMethod] ||
-      varPaths.find((d) => d.regExp.test(fullPath))?.methods?.[lowerCaseMethod]
-    ) {
-      return { address, swagger }
+    let item = pathMap[fullPath]
+
+    if (item) {
+      return { address, swagger, path: item?.path }
+    }
+
+    item = varPaths.find((d) => d.regExp.test(fullPath))
+
+    if (item?.methods?.[lowerCaseMethod]) {
+      return { address, swagger, path: item.path }
     }
   }
 }
