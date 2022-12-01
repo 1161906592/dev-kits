@@ -102,7 +102,7 @@ export async function scriptParser(swagger: SwaggerV2 | SwaggerV3, path: string,
   const mock = (await getConfig())?.mock
 
   if ((swagger as SwaggerV2).definitions) {
-    return `export default ({ Mockjs }) => {
+    return `export default ({ Mockjs, cache }) => {
       return Mockjs.mock(${JSON.stringify(
         resolveMockTemplate(
           (swagger as SwaggerV2).paths[path]?.[method]?.responses[200].schema?.$ref,
@@ -116,7 +116,7 @@ export async function scriptParser(swagger: SwaggerV2 | SwaggerV3, path: string,
     }`
   }
 
-  return `export default ({ Mockjs }) => {
+  return `export default ({ Mockjs, cache }) => {
     return Mockjs.mock(${JSON.stringify(
       resolveMockTemplate(
         Object.values((swagger as SwaggerV3).paths[path]?.[method]?.responses[200]?.content || {})[0]?.schema?.$ref,

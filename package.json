@@ -8,7 +8,7 @@
     "dev": "esno src/app.ts",
     "build": "tsc",
     "start": "node lib/app.js",
-    "release": "bumpp && tsc && npm publish --access public"
+    "release": "bumpp && tsc && npm publish"
   },
   "bin": {
     "dev-kits": "bin/index.js"
@@ -22,6 +22,9 @@
     "lib",
     "CHANGELOG.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "keywords": [
     "openapi",
     "java",
@@ -62,6 +65,7 @@
     "http-proxy": "^1.18.1",
     "koa": "^2.13.4",
     "koa-body": "^5.0.0",
+    "lru-cache": "^7.14.1",
     "mockjs": "^1.1.0",
     "picocolors": "^1.0.0",
     "prettier": "^2.7.1",

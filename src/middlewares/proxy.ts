@@ -8,6 +8,7 @@ import { getConfig } from '../common/config'
 import { loadMockCode } from '../common/repository'
 import { findSwager } from '../common/swagger'
 import { runScriptInSandbox } from '../common/utils'
+import { getCacheByPath } from './mock'
 
 const logger = (type: string, from: string, to: string) =>
   console.log(`${colors.bold(type)}:  ${colors.green(from)} -> ${colors.cyan(to)}`)
@@ -140,7 +141,11 @@ export default function proxyMiddleware(server: Server, watcher: FSWatcher): Mid
       try {
         const data = JSON.stringify(
           // todo 待优化
-          await runScriptInSandbox(code)({ Mockjs: require('mockjs'), dayjs: require('dayjs') })
+          await runScriptInSandbox(code)({
+            Mockjs: require('mockjs'),
+            dayjs: require('dayjs'),
+            cache: getCacheByPath(path),
+          })
         )
 
         socketSet.forEach((socket) => {

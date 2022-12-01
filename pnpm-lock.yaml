@@ -26,6 +26,7 @@ specifiers:
   http-proxy: ^1.18.1
   koa: ^2.13.4
   koa-body: ^5.0.0
+  lru-cache: ^7.14.1
   mockjs: ^1.1.0
   picocolors: ^1.0.0
   prettier: ^2.7.1
@@ -49,6 +50,7 @@ dependencies:
   http-proxy: 1.18.1
   koa: 2.13.4
   koa-body: 5.0.0
+  lru-cache: 7.14.1
   mockjs: 1.1.0
   picocolors: 1.0.0
   prettier: 2.7.1
@@ -2292,6 +2294,11 @@ packages:
     dependencies:
       yallist: 4.0.0
     dev: true
+
+  /lru-cache/7.14.1:
+    resolution: {integrity: sha512-ysxwsnTKdAx96aTRdhDOCQfDgbHnt8SK0KY8SEjO0wHinhWOFTESbjVCMPbU1uGXg/ch4lifqx0wfjOawU2+WA==}
+    engines: {node: '>=12'}
+    dev: false
 
   /media-typer/0.3.0:
     resolution: {integrity: sha512-dq+qelQ9akHpcOl/gUVRTxVIOkAJ1wR3QAvb4RsVjS8oVoFjDGTc679wJYmUmknUF5HwMLOgb5O+a3KxfWapPQ==}
