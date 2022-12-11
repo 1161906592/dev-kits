@@ -8,7 +8,7 @@ export interface Codegen {
   label: string
   key: string
   children?: Codegen[]
-  render?(model: Record<string, unknown>, options: string[]): MaybePromise<string>
+  render?(model: Record<string, unknown>): MaybePromise<string>
 }
 
 export interface Address {

@@ -169,7 +169,7 @@ class ApiController {
 
   async codegen(ctx: ParameterizedContext) {
     const codegen = await resolveCodegen(ctx.request.body.key as string)
-    let code = (await codegen?.render?.(ctx.request.body.model, ctx.request.body.options)) || ''
+    let code = (await codegen?.render?.(ctx.request.body.model)) || ''
 
     if (code) {
       try {
