@@ -20,7 +20,7 @@ export async function loadSwagger(options: { address: string; suffix: string }) 
     const varPaths: { regExp: RegExp; methods: Record<string, unknown> | undefined; path: string }[] = []
 
     Object.keys(res.data.paths).forEach((path) => {
-      const fullPath = patchPath?.(path, address) || path
+      const fullPath = patchPath?.(path, address).replace(/\/+/g, '/') || path
 
       if (/\{(.+?)\}/.test(fullPath)) {
         varPaths.push({
