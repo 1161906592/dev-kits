@@ -8,7 +8,7 @@
     "dev": "esno src/app.ts",
     "build": "tsc",
     "start": "node lib/app.js",
-    "release": "bumpp && tsc && npm publish"
+    "release": "tsc && bumpp && npm publish"
   },
   "bin": {
     "dev-kits": "bin/index.js"
