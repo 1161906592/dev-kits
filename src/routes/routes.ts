@@ -12,6 +12,7 @@ router.get('/api/config', api.config)
 router.get('/api/apiCode', api.apiCode)
 router.post('/api/syncCode', api.syncCode)
 router.post('/api/codegen', api.codegen)
+router.post('/api/download', api.download)
 
 router.get('/mock/mockCode', mock.mockCode)
 router.post('/mock/updateMock', mock.updateMock)

@@ -1,5 +1,6 @@
 import parser from '@liuyang0826/openapi-parser'
 import axios from 'axios'
+import compressing from 'compressing'
 import execa from 'execa'
 import * as fs from 'fs-extra'
 import { ParameterizedContext } from 'koa'
@@ -173,13 +174,73 @@ class ApiController {
 
     if (code) {
       try {
-        code = formatCode(code)
+        code = formatCode(
+          code.replace(/<file-block(?:\s+path=(["'])(.+?)\1)?[^>]*>([\w\W]+?)<\/file-block>/g, (...value) =>
+            value ? `// file-block-start: ${value[2]}\n${value[3]}\n// file-block-end: ${value[2]}\n` : ''
+          )
+        )
       } catch (e) {
         console.log(e)
       }
     }
 
     ctx.ok(code)
+  }
+
+  async download(ctx: ParameterizedContext) {
+    const codegen = await resolveCodegen(ctx.request.body.key as string)
+    let code = (await codegen?.render?.(ctx.request.body.model)) || ''
+
+    if (!code) {
+      throw new Error('下载失败')
+    }
+
+    try {
+      const matches: string[] = code.match(/<file-block[^>]*>[\w\W]+?<\/file-block>/g) || []
+
+      matches.forEach((match) => {
+        code = code.replace(match, '').trim()
+      })
+
+      code = formatCode(code.replace(/<file-block[^>]*>([\w\W]+?)<\/file-block>/, (...value) => value[1]))
+      const zipStream = new compressing.zip.Stream()
+
+      if (code) {
+        zipStream.addEntry(Buffer.from(code), { relativePath: 'Index.tsx' })
+      }
+
+      // 同路径文件内容合并
+      const files = matches.reduce((acc, match, index) => {
+        let [, , path, content = ''] =
+          match.match(/<file-block(?:\s+path=(["'])(.+?)\1)?[^>]*>([\w\W]+?)<\/file-block>/) || []
+
+        try {
+          content = formatCode(content)
+          path = path || `file_${index + 1}`
+        } catch (e) {
+          console.log(e)
+        }
+
+        if (acc[path]) {
+          acc[path] += `\n${content}`
+        } else {
+          acc[path] = content
+        }
+
+        return acc
+      }, {} as Record<string, string>)
+
+      Object.keys(files).forEach((path) => {
+        zipStream.addEntry(Buffer.from(files[path]), { relativePath: path })
+      })
+
+      ctx.set('Content-Type', 'application/zip')
+      ctx.set('Access-Control-Expose-Headers', 'Content-Disposition')
+      ctx.set('Content-Disposition', 'attachment;filename=download.zip')
+      ctx.body = zipStream
+    } catch (e) {
+      console.log(e)
+    }
   }
 }
 
