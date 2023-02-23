@@ -190,57 +190,91 @@ class ApiController {
   async download(ctx: ParameterizedContext) {
     const codegen = await resolveCodegen(ctx.request.body.key as string)
     let code = (await codegen?.render?.(ctx.request.body.model)) || ''
+    if (!code) throw new Error('下载失败')
+    const matches: string[] = code.match(/<file-block[^>]*>[\w\W]+?<\/file-block>/g) || []
 
-    if (!code) {
-      throw new Error('下载失败')
-    }
+    matches.forEach((match) => {
+      code = code.replace(match, '').trim()
+    })
 
-    try {
-      const matches: string[] = code.match(/<file-block[^>]*>[\w\W]+?<\/file-block>/g) || []
+    code = formatCode(code.replace(/<file-block[^>]*>([\w\W]+?)<\/file-block>/, (...value) => value[1]))
+    const zipStream = new compressing.zip.Stream()
 
-      matches.forEach((match) => {
-        code = code.replace(match, '').trim()
-      })
+    // 同路径文件内容合并
+    const files = matches.reduce((acc, match, index) => {
+      let [, , path, content = ''] =
+        match.match(/<file-block(?:\s+path=(["'])(.+?)\1)?[^>]*>([\w\W]+?)<\/file-block>/) || []
 
-      code = formatCode(code.replace(/<file-block[^>]*>([\w\W]+?)<\/file-block>/, (...value) => value[1]))
-      const zipStream = new compressing.zip.Stream()
-
-      if (code) {
-        zipStream.addEntry(Buffer.from(code), { relativePath: 'Index.tsx' })
+      try {
+        content = formatCode(content)
+        path = path || `file_${index + 1}`
+      } catch (e) {
+        console.log(e)
       }
 
-      // 同路径文件内容合并
-      const files = matches.reduce((acc, match, index) => {
-        let [, , path, content = ''] =
-          match.match(/<file-block(?:\s+path=(["'])(.+?)\1)?[^>]*>([\w\W]+?)<\/file-block>/) || []
+      if (acc[path]) {
+        acc[path] += `\n${content}`
+      } else {
+        acc[path] = content
+      }
 
-        try {
-          content = formatCode(content)
-          path = path || `file_${index + 1}`
-        } catch (e) {
-          console.log(e)
-        }
+      return acc
+    }, (code ? { 'Index.tsx': code } : {}) as Record<string, string>)
 
-        if (acc[path]) {
-          acc[path] += `\n${content}`
-        } else {
-          acc[path] = content
-        }
+    Object.keys(files).forEach((path) => {
+      zipStream.addEntry(Buffer.from(files[path]), { relativePath: path })
+    })
 
-        return acc
-      }, {} as Record<string, string>)
+    ctx.set('Content-Type', 'application/zip')
+    ctx.set('Access-Control-Expose-Headers', 'Content-Disposition')
+    ctx.set('Content-Disposition', 'attachment;filename=download.zip')
+    ctx.body = zipStream
+  }
 
-      Object.keys(files).forEach((path) => {
-        zipStream.addEntry(Buffer.from(files[path]), { relativePath: path })
+  async syncComponent(ctx: ParameterizedContext) {
+    const codegen = await resolveCodegen(ctx.request.body.key as string)
+    const dir = ctx.request.body.dir as string
+    if (!dir) throw new Error('同步失败')
+    let code = (await codegen?.render?.(ctx.request.body.model)) || ''
+    if (!code) throw new Error('同步失败')
+    const matches: string[] = code.match(/<file-block[^>]*>[\w\W]+?<\/file-block>/g) || []
+
+    matches.forEach((match) => {
+      code = code.replace(match, '').trim()
+    })
+
+    code = formatCode(code.replace(/<file-block[^>]*>([\w\W]+?)<\/file-block>/, (...value) => value[1]))
+
+    // 同路径文件内容合并
+    const files = matches.reduce((acc, match, index) => {
+      let [, , path, content = ''] =
+        match.match(/<file-block(?:\s+path=(["'])(.+?)\1)?[^>]*>([\w\W]+?)<\/file-block>/) || []
+
+      try {
+        content = formatCode(content)
+        path = path || `file_${index + 1}`
+      } catch (e) {
+        console.log(e)
+      }
+
+      if (acc[path]) {
+        acc[path] += `\n${content}`
+      } else {
+        acc[path] = content
+      }
+
+      return acc
+    }, (code ? { 'Index.tsx': code } : {}) as Record<string, string>)
+
+    await Promise.all(
+      Object.keys(files).map(async (relativePath) => {
+        const filePath = `${process.cwd()}/src/pages/${dir}/${relativePath}`.replace(/\//g, '/')
+        await fs.ensureFile(filePath)
+        await fs.writeFile(filePath, files[relativePath])
       })
+    )
 
-      ctx.set('Content-Type', 'application/zip')
-      ctx.set('Access-Control-Expose-Headers', 'Content-Disposition')
-      ctx.set('Content-Disposition', 'attachment;filename=download.zip')
-      ctx.body = zipStream
-    } catch (e) {
-      console.log(e)
-    }
+    ctx.ok('同步成功')
   }
 }
 
