@@ -7,8 +7,8 @@ import { findCodegen } from './utils'
 let config: Promise<IConfig> | undefined
 let router: Promise<Router | undefined> | undefined
 
-export function getConfig() {
-  return config
+export function getConfig(): Promise<IConfig> {
+  return config ?? Promise.resolve({})
 }
 
 export function getRouter() {

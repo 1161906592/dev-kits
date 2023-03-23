@@ -42,10 +42,11 @@ export interface IConfig {
   address?: Address[]
   proxy?: ProxyOptions
   mock?: MockOptions
-  languages: Language[] | ((id?: string) => MaybePromise<Language | Language[]>)
+  languages?: Language[] | ((id?: string) => MaybePromise<Language | Language[]>)
   patchRouter?(KoaRouter: typeof Router): Router
   // 最大缓存文档数量
   maxSize?: number
+  root?: string
 }
 
 export function defineConfig(config: IConfig) {

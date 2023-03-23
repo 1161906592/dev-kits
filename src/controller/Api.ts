@@ -34,7 +34,7 @@ class ApiController {
     const method = ctx.query.method as string
     const lang = ctx.query.lang as string
 
-    const { patchPath } = (await getConfig()) || {}
+    const { patchPath } = await getConfig()
     const fullPath = patchPath?.(path, address) || path
     const { swagger } = (await findSwager({ fullPath, method })) || {}
     if (!swagger) return
@@ -65,7 +65,9 @@ class ApiController {
       query,
     } = ctx
 
-    const { patchPath, filePath: getFilePath } = (await getConfig()) || {}
+    const config = await getConfig()
+    const { patchPath, filePath: getFilePath } = config
+    const root = config.root ?? `${process.cwd()}/src`
 
     const result = await Promise.all(
       (body as { path: string; method: string; lang: string }[]).map(async ({ path, method, lang }) => {
@@ -86,8 +88,7 @@ class ApiController {
         if (!language) return
 
         const { render, extension } = language
-        let result = ''
-        result = (await render?.({ path: realPath, method, ...program })) || ''
+        let result = (await render?.({ path: realPath, method, ...program })) || ''
 
         if (result) {
           try {
@@ -97,10 +98,12 @@ class ApiController {
           }
         }
 
-        const filePath = `${`${(getFilePath ? getFilePath(fullPath) : `${process.cwd()}/src${fullPath}`).replace(
-          /\//g,
+        const extensionPath = `${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.${extension}`
+
+        const filePath = `${root}/${getFilePath ? getFilePath(fullPath) : fullPath}/${extensionPath}`.replace(
+          /\/+/g,
           '/'
-        )}${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.${extension}`}`
+        )
 
         // 检测是否禁止覆盖
         const isExists = await fs.pathExists(filePath)
@@ -163,7 +166,7 @@ class ApiController {
 
     ctx.ok({
       codegen,
-      address: (await getConfig())?.address || [],
+      address: (await getConfig()).address || [],
       languages: (languages as Language[])?.map((d) => d.type) || [],
     })
   }
@@ -266,9 +269,12 @@ class ApiController {
       return acc
     }, (code ? { 'Index.tsx': code } : {}) as Record<string, string>)
 
+    const config = await getConfig()
+    const root = config.root ?? `${process.cwd()}/src`
+
     await Promise.all(
       Object.keys(files).map(async (relativePath) => {
-        const filePath = `${process.cwd()}/src/pages/${dir}/${relativePath}`.replace(/\//g, '/')
+        const filePath = `${root}/${dir}/${relativePath}`.replace(/\/+/g, '/')
         await fs.ensureFile(filePath)
         await fs.writeFile(filePath, files[relativePath])
       })
