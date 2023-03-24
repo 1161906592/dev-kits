@@ -98,12 +98,9 @@ class ApiController {
           }
         }
 
-        const extensionPath = `${Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''}.${extension}`
-
-        const filePath = `${root}/${getFilePath ? getFilePath(fullPath) : fullPath}/${extensionPath}`.replace(
-          /\/+/g,
-          '/'
-        )
+        const filePath = `${root}/${getFilePath ? getFilePath(fullPath) : fullPath}${
+          Object.keys(curPath).length > 1 ? `-${method.toLocaleLowerCase()}` : ''
+        }.${extension}`.replace(/\/+/g, '/')
 
         // 检测是否禁止覆盖
         const isExists = await fs.pathExists(filePath)
