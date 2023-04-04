@@ -1,11 +1,10 @@
-import { SwaggerV2, SwaggerV3 } from '@liuyang0826/openapi-parser'
 import axios from 'axios'
 import { getConfig } from './config'
 
 const swaggerRecords: {
   address: string
   loader: Promise<{
-    swagger: SwaggerV2 | SwaggerV3 | null
+    swagger: any
     pathMap: Record<string, { methods: Record<string, unknown> | undefined; path: string } | undefined>
     varPaths: { regExp: RegExp; methods: Record<string, unknown> | undefined; path: string }[]
   }>
@@ -15,7 +14,7 @@ export async function loadSwagger(options: { address: string; suffix: string }) 
   const { address, suffix } = options
   const patchPath = (await getConfig())?.patchPath
 
-  const loader = axios.get<SwaggerV2 | SwaggerV3>(address + suffix).then((res) => {
+  const loader = axios.get<any>(address + suffix).then((res) => {
     const pathMap: Record<string, { methods: Record<string, unknown> | undefined; path: string } | undefined> = {}
     const varPaths: { regExp: RegExp; methods: Record<string, unknown> | undefined; path: string }[] = []
 

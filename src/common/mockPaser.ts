@@ -1,8 +1,7 @@
-import { Definition, Property, SwaggerV2, SwaggerV3 } from '@liuyang0826/openapi-parser'
 import { MockOptions } from '..'
 import { getConfig } from './config'
 
-function toMockTemplate(name: string, property: Property, deep: number): unknown {
+function toMockTemplate(name: string, property: any, deep: number): unknown {
   if (deep === 1 && name === 'code') {
     return 0
   }
@@ -39,7 +38,7 @@ function toMockTemplate(name: string, property: Property, deep: number): unknown
 
 function resolveMockTemplate(
   ref = '',
-  definitions: Record<string, Definition | undefined>,
+  definitions: Record<string, any | undefined>,
   collectors: string[],
   mock: MockOptions | undefined
 ) {
@@ -78,38 +77,33 @@ function resolveMockTemplate(
   return result
 }
 
-export async function mockParser(swagger: SwaggerV2 | SwaggerV3, path: string, method: string) {
+export async function mockParser(swagger: any, path: string, method: string) {
   const mock = (await getConfig())?.mock
 
-  if ((swagger as SwaggerV2).definitions) {
+  if (swagger.definitions) {
     return resolveMockTemplate(
-      (swagger as SwaggerV2).paths[path]?.[method]?.responses[200].schema?.$ref,
-      (swagger as SwaggerV2).definitions,
+      swagger.paths[path]?.[method]?.responses[200].schema?.$ref,
+      swagger.definitions,
       [],
       mock
     )
   }
 
   return resolveMockTemplate(
-    Object.values((swagger as SwaggerV3).paths[path]?.[method]?.responses[200]?.content || {})[0]?.schema?.$ref,
-    (swagger as SwaggerV3).components.schemas,
+    (Object.values(swagger.paths[path]?.[method]?.responses[200]?.content || {})[0] as any)?.schema?.$ref,
+    swagger.components.schemas,
     [],
     mock
   )
 }
 
-export async function scriptParser(swagger: SwaggerV2 | SwaggerV3, path: string, method: string) {
+export async function scriptParser(swagger: any, path: string, method: string) {
   const mock = (await getConfig())?.mock
 
-  if ((swagger as SwaggerV2).definitions) {
+  if (swagger.definitions) {
     return `export default ({ Mockjs, cache }) => {
       return Mockjs.mock(${JSON.stringify(
-        resolveMockTemplate(
-          (swagger as SwaggerV2).paths[path]?.[method]?.responses[200].schema?.$ref,
-          (swagger as SwaggerV2).definitions,
-          [],
-          mock
-        ),
+        resolveMockTemplate(swagger.paths[path]?.[method]?.responses[200].schema?.$ref, swagger.definitions, [], mock),
         null,
         2
       )})
@@ -119,8 +113,8 @@ export async function scriptParser(swagger: SwaggerV2 | SwaggerV3, path: string,
   return `export default ({ Mockjs, cache }) => {
     return Mockjs.mock(${JSON.stringify(
       resolveMockTemplate(
-        Object.values((swagger as SwaggerV3).paths[path]?.[method]?.responses[200]?.content || {})[0]?.schema?.$ref,
-        (swagger as SwaggerV3).components.schemas,
+        (Object.values(swagger.paths[path]?.[method]?.responses[200]?.content || {})[0] as any)?.schema?.$ref,
+        swagger.components.schemas,
         [],
         mock
       ),

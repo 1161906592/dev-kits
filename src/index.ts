@@ -1,5 +1,4 @@
 import Router from '@koa/router'
-import { Property } from '@liuyang0826/openapi-parser'
 import * as HttpProxy from 'http-proxy'
 
 export type MaybePromise<T> = T | Promise<T>
@@ -26,7 +25,7 @@ export interface ProxyOptions extends HttpProxy.ServerOptions {
 
 export interface MockOptions {
   listCount?: `${number}-${number}` | number
-  template?(name: string, property: Property, deep: number): unknown
+  template?(name: string, property: any, deep: number): unknown
 }
 
 export interface Language {
@@ -53,4 +52,4 @@ export function defineConfig(config: IConfig) {
   return config
 }
 
-export type { Property, HttpProxy }
+export type { HttpProxy }
