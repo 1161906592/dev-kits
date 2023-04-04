@@ -4,7 +4,7 @@ specifiers:
   '@koa/cors': ^3.4.1
   '@koa/router': ^12.0.0
   '@liuyang0826/eslint-config': ^0.0.1
-  '@liuyang0826/openapi-parser': ^0.0.7
+  '@liuyang0826/openapi-parser': ^0.1.0
   '@types/fs-extra': ^9.0.13
   '@types/http-proxy': ^1.17.9
   '@types/koa': ^2.13.5
@@ -39,7 +39,7 @@ specifiers:
 dependencies:
   '@koa/cors': 3.4.1
   '@koa/router': 12.0.0
-  '@liuyang0826/openapi-parser': 0.0.7
+  '@liuyang0826/openapi-parser': 0.1.0
   '@types/http-proxy': 1.17.9
   '@types/koa__router': 12.0.0
   axios: 0.27.2
@@ -215,8 +215,11 @@ packages:
       - typescript
     dev: true
 
-  /@liuyang0826/openapi-parser/0.0.7:
-    resolution: {integrity: sha512-ZI5G2fDGNhMUb+pmRFMZ9n5XyMhiahEKk2/E2EL50t3obuwbFkaEyPq2Wz087uTyWSeMwY2vZs4WM/y3XlJHng==}
+  /@liuyang0826/openapi-parser/0.1.0:
+    resolution: {integrity: sha512-hHAgBebcedcfrHZjTShNVokKtvjiSAMyfWxwXbbCtzVgrknHZl9mJa8w3sGSoW7zsurE4jNc1FhcF4qTKv9B3A==}
+    dependencies:
+      reserved-words: 0.1.2
+      tiny-pinyin: 1.3.2
     dev: false
 
   /@nodelib/fs.scandir/2.1.5:
@@ -2762,6 +2765,10 @@ packages:
     resolution: {integrity: sha512-KigOCHcocU3XODJxsu8i/j8T9tzT4adHiecwORRQ0ZZFcp7ahwXuRU1m+yuO90C5ZUyGeGfocHDI14M3L3yDAQ==, registry: http://192.168.50.114:7001/, tarball: http://192.168.50.114:7001/requires-port/-/requires-port-1.0.0.tgz}
     dev: false
 
+  /reserved-words/0.1.2:
+    resolution: {integrity: sha512-0S5SrIUJ9LfpbVl4Yzij6VipUdafHrOTzvmfazSw/jeZrZtQK303OPZW+obtkaw7jQlTQppy0UvZWm9872PbRw==}
+    dev: false
+
   /resolve-from/4.0.0:
     resolution: {integrity: sha512-pb/MYmXstAkysRFx8piNI1tGFNQIFA3vkE3Gq4EuA1dF6gHp/+vgZqsCGJapvy8N3Q+4o7FwvquPJcnZ7RYy4g==}
     engines: {node: '>=4'}
@@ -2987,6 +2994,10 @@ packages:
   /text-table/0.2.0:
     resolution: {integrity: sha512-N+8UisAXDGk8PFXP4HAzVR9nbfmVJ3zYLAWiTIoqC5v5isinhr+r5uaO8+7r3BMfuNIufIsA7RdpVgacC2cSpw==, registry: http://192.168.50.114:7001/, tarball: http://192.168.50.114:7001/text-table/-/text-table-0.2.0.tgz}
     dev: true
+
+  /tiny-pinyin/1.3.2:
+    resolution: {integrity: sha512-uHNGu4evFt/8eNLldazeAM1M8JrMc1jshhJJfVRARTN3yT8HEEibofeQ7QETWQ5ISBjd6fKtTVBCC/+mGS6FpA==}
+    dev: false
 
   /to-buffer/1.1.1:
     resolution: {integrity: sha512-lx9B5iv7msuFYE3dytT+KE5tap+rNYw+K4jVkb9R/asAb+pbBSM17jtunHplhBe6RRJdZx3Pn2Jph24O32mOVg==}
