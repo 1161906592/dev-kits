@@ -1,3 +1,5 @@
 #!/usr/bin/env node
 
-require('../lib/app')
+const { devKits } = require('../lib')
+
+devKits()

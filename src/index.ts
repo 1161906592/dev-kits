@@ -52,4 +52,6 @@ export function defineConfig(config: IConfig) {
   return config
 }
 
+export { startServer } from './app'
+
 export type { HttpProxy }

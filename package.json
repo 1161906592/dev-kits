@@ -5,9 +5,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
-    "dev": "esno src/app.ts",
     "build": "tsc",
-    "start": "node lib/app.js",
     "release": "tsc && bumpp && npm publish"
   },
   "bin": {
@@ -63,6 +61,7 @@
     "esbuild": "^0.15.6",
     "execa": "^4.0.2",
     "fs-extra": "^10.1.0",
+    "get-port-please": "^3.0.1",
     "http-proxy": "^1.18.1",
     "koa": "^2.13.4",
     "koa-body": "^5.0.0",
