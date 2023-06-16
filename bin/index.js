@@ -1,5 +1,5 @@
 #!/usr/bin/env node
 
-const { devKits } = require('../lib')
+const { startServer } = require('../lib')
 
-devKits()
+startServer()
